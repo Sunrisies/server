@@ -1,28 +1,37 @@
-use std::time::Duration;
-
 use actix_web::{App, HttpServer};
-use sea_orm::{ConnectOptions, Database};
-use server::config_routes;
+use anyhow::Result;
+use chrono::Utc;
+use sea_orm::ActiveModelTrait;
+use sea_orm::ActiveValue::Set;
+use server::models::user::{self};
+use server::{config_routes, create_db_pool};
 
-#[actix_web::main] // or #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    let mut opt = ConnectOptions::new("postgres://postgres:server123456@127.0.0.1:5432/database");
-    opt.max_connections(100)
-        .min_connections(5)
-        .connect_timeout(Duration::from_secs(8))
-        .acquire_timeout(Duration::from_secs(8))
-        .idle_timeout(Duration::from_secs(8))
-        .max_lifetime(Duration::from_secs(8))
-        .sqlx_logging(true)
-        // .sqlx_logging_level(log::LevelFilter::Info)
-        .set_schema_search_path("my_schema"); // Setting default PostgreSQL schema
-
-    let _db = Database::connect(opt).await;
-
-    HttpServer::new(|| App::new().configure(config_routes))
+#[actix_web::main]
+async fn main() -> Result<()> {
+    let db = create_db_pool().await?;
+    let new_user = user::ActiveModel {
+        user_name: Set("1111".to_string()),
+        pass_word: Set("2222".to_string()),
+        permissions: Set(Some("3333".to_string())), // 设置默认权限
+        uuid: Set("4444".to_string()),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    };
+    match new_user.insert(&db).await {
+        Ok(_) => println!("User created successfully"),
+        Err(e) => println!("Error creating user: {}", e),
+    }
+    println!("Database connected");
+    let _ = HttpServer::new(|| App::new().configure(config_routes))
         .bind(("0.0.0.0", 2345))?
+        .on_connect(move |conn, _addr| {
+            println!("New connection: {:?}", conn);
+            println!("Remote address: {:?}", _addr);
+        })
         .run()
-        .await
+        .await;
+    Ok(())
 }
 
 #[cfg(test)]
