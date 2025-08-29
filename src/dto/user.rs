@@ -39,3 +39,12 @@ impl fmt::Display for ValidationErrorMsg<'_> {
         Ok(())
     }
 }
+
+#[derive(Deserialize, Debug, Default, Clone, Serialize, Validate)]
+pub struct UpdateUserRequest {
+    #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
+    pub user_name: String,
+    #[serde(rename = "image")]
+    pub image: Option<String>,
+    pub permissions: Option<Vec<String>>,
+}
