@@ -1,13 +1,16 @@
-use actix_web::{Responder, web};
+use actix_web::{HttpResponse, Responder, web};
 use chrono::Utc;
 use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, DatabaseConnection};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, ModelTrait, QuerySelect};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
 use crate::dto::user::ValidationErrorMsg;
-use crate::{RegisterResponse, user};
+use crate::{
+    RegisterResponse,
+    user::{self, Entity as UserEntity},
+};
 
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct PaginationQuery {
@@ -19,12 +22,24 @@ pub struct PaginationQuery {
 }
 
 // 获取
-async fn get_demo(query: web::Query<PaginationQuery>) -> impl Responder {
-    format!(
-        "获取 page{:?} limit{:?}!",
-        query.page.unwrap_or(1),
-        query.limit.unwrap_or(10)
-    )
+async fn get_demo(
+    db_pool: web::Data<DatabaseConnection>,
+    query: web::Query<PaginationQuery>,
+) -> impl Responder {
+    let PaginationQuery { page, limit } = query.into_inner();
+
+    match user::Entity::find()
+        .limit(limit.unwrap_or(10).min(100))
+        .offset((page.unwrap_or(1) - 1) * limit.unwrap_or(10).min(100))
+        .all(db_pool.as_ref())
+        .await
+    {
+        Ok(data) => HttpResponse::Ok().json(data),
+        Err(e) => {
+            println!("Database query error: {}", e);
+            HttpResponse::InternalServerError().json("Database query error")
+        }
+    }
 }
 // 新增
 async fn post_demo(
@@ -61,19 +76,38 @@ async fn post_demo(
 }
 
 // 修改
-async fn put_demo(
-    uuid: web::Path<String>,
-    user_data: web::Json<RegisterResponse>,
-) -> impl Responder {
-    format!(
-        "修改 uuid:{:?} user_name{:?} pass_word{:?}!",
-        uuid, user_data.user_name, user_data.pass_word
-    )
+async fn put_demo() -> impl Responder {
+    "修改 uuid:{:?}!".to_string()
 }
 
 // 删除
-async fn delete_demo(uuid: web::Path<String>) -> impl Responder {
-    format!("删除 uuid:{:?}!", uuid)
+async fn delete_demo(db: web::Data<DatabaseConnection>, uuid: web::Path<String>) -> impl Responder {
+    // 验证UUID格式
+    let uuid_result = Uuid::parse_str(&uuid);
+    let uuid = match uuid_result {
+        Ok(u) => u,
+        Err(_) => return HttpResponse::InternalServerError().json("Database query error"),
+    };
+
+    // 先找到用户
+    let existing_user = match UserEntity::find_by_uuid(&uuid.to_string())
+        .one(db.as_ref())
+        .await
+    {
+        Ok(u) => u,
+        Err(_e) => return HttpResponse::InternalServerError().json("Database query error"),
+    };
+
+    match existing_user {
+        Some(user) => {
+            // 删除用户
+            match user.delete(db.as_ref()).await {
+                Ok(_) => HttpResponse::Ok().json("删除成功"),
+                Err(_e) => HttpResponse::InternalServerError().json("Database query error"),
+            }
+        }
+        None => HttpResponse::NotFound().json("User not found"),
+    }
 }
 
 // 获取单个
