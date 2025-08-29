@@ -1,6 +1,14 @@
 use actix_web::{Responder, web};
+use chrono::Utc;
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, DatabaseConnection};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use validator::Validate;
+
+use crate::dto::user::ValidationErrorMsg;
+use crate::{RegisterResponse, user};
+
 #[derive(Validate, Debug, Clone, Serialize, Deserialize)]
 pub struct PaginationQuery {
     #[validate(range(min = 1, message = "页码必须大于1"))]
@@ -9,13 +17,7 @@ pub struct PaginationQuery {
     #[validate(range(max = 10, message = "每页数量不能超过100"))]
     pub limit: Option<u64>,
 }
-#[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
-pub struct LoginRequest {
-    #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
-    pub user_name: String,
-    #[validate(length(min = 6, max = 100, message = "密码长度必须在6到100之间"))]
-    pub pass_word: String,
-}
+
 // 获取
 async fn get_demo(query: web::Query<PaginationQuery>) -> impl Responder {
     format!(
@@ -25,15 +27,44 @@ async fn get_demo(query: web::Query<PaginationQuery>) -> impl Responder {
     )
 }
 // 新增
-async fn post_demo(user_data: web::Json<LoginRequest>) -> impl Responder {
-    format!(
-        "添加 user_name{:?} pass_word{:?}!",
-        user_data.user_name, user_data.pass_word
-    )
+async fn post_demo(
+    db_pool: web::Data<DatabaseConnection>,
+    user_data: web::Json<RegisterResponse>,
+) -> impl Responder {
+    // 校验
+    if let Err(errors) = user_data.validate() {
+        let msg = ValidationErrorMsg(&errors);
+        println!("Validation errors:-- {}", msg);
+        return format!("Validation errors: {}", msg);
+    }
+    let RegisterResponse {
+        user_name,
+        pass_word,
+    } = user_data.into_inner();
+    println!("Validated user data: {:?}", user_name);
+    println!("Validated user data: {:?}", pass_word);
+    let new_user = user::ActiveModel {
+        user_name: Set(user_name.to_string()),
+        pass_word: Set(pass_word.to_string()),
+        permissions: Set(Some("33333".to_string())), // 设置默认权限
+        uuid: Set(Uuid::new_v4().to_string()),       // 生成唯一的UUID
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    };
+    match new_user.insert(db_pool.as_ref()).await {
+        Ok(_) => println!("User created successfully"),
+        Err(e) => println!("Error creating user: {}", e),
+    }
+    println!("Database connected");
+    "添加成功".to_string()
 }
 
 // 修改
-async fn put_demo(uuid: web::Path<String>, user_data: web::Json<LoginRequest>) -> impl Responder {
+async fn put_demo(
+    uuid: web::Path<String>,
+    user_data: web::Json<RegisterResponse>,
+) -> impl Responder {
     format!(
         "修改 uuid:{:?} user_name{:?} pass_word{:?}!",
         uuid, user_data.user_name, user_data.pass_word
