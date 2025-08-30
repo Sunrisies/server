@@ -1,10 +1,12 @@
 use actix_web::{App, HttpServer, web};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use server::{config_routes, create_db_pool};
 
 #[actix_web::main]
 async fn main() -> Result<()> {
-    let db = create_db_pool().await?;
+    let db = create_db_pool()
+        .await
+        .context("Failed to connect to database")?;
     // 将db添加到应用数据中
     let db_pool = web::Data::new(db);
 
