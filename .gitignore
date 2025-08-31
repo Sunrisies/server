@@ -2,3 +2,4 @@
 postgresql
 migration
 *.env
+change-commit-date.sh
