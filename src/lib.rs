@@ -6,3 +6,5 @@ pub mod config;
 pub use config::create_db_pool;
 pub mod dto;
 pub use dto::RegisterResponse;
+pub mod middleware;
+pub use middleware::helpers::*;

@@ -18,7 +18,48 @@ pub struct RegisterResponse {
     #[validate(length(min = 6, max = 100, message = "密码长度必须在6到100之间"))]
     pub pass_word: String,
 }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ValidationErrorItem {
+    pub name: String,
+    pub error: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ValidationErrorJson {
+    // 字段名 -> 错误消息数组
+    pub errors: Vec<ValidationErrorItem>,
+}
 pub struct ValidationErrorMsg<'a>(pub &'a ValidationErrors);
+impl ValidationErrorJson {
+    pub fn from_validation_errors(errs: &ValidationErrors) -> Self {
+        let mut list = Vec::new();
+        for (field, field_errs) in errs.field_errors() {
+            for err in field_errs {
+                let msg = err
+                    .message
+                    .as_ref()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "invalid value".into());
+                list.push(ValidationErrorItem {
+                    name: field.to_string(),
+                    error: msg,
+                });
+            }
+        }
+        ValidationErrorJson { errors: list }
+    }
+}
+// impl fmt::Display for ValidationErrorJson {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let parts = self
+//             .errors
+//             .iter()
+//             .map(|item| format!("{}: {}", item.name, item.error));
+//         // 多个错误信息用分号分隔
+//         write!(f, "{}", parts.collect::<Vec<_>>().join("; "))
+//         // write!(f, "{}", parts.join("; "))
+//     }
+// }
 
 impl fmt::Display for ValidationErrorMsg<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
