@@ -1,6 +1,6 @@
 use sea_orm::{DeleteResult, entity::prelude::*};
 use serde::{Deserialize, Serialize};
-// use serde_json::Value as JsonValue;
+use serde_json::Value as JsonValue;
 #[derive(Debug, Clone, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "users")]
 pub struct Model {
@@ -45,18 +45,18 @@ impl Entity {
     }
 }
 
-// impl From<Model> for JsonValue {
-//     fn from(model: Model) -> JsonValue {
-//         serde_json::to_value(model).unwrap()
-//     }
-// }
+impl From<Model> for JsonValue {
+    fn from(model: Model) -> JsonValue {
+        serde_json::to_value(model).unwrap()
+    }
+}
 
-// impl TryFrom<JsonValue> for Model {
-//     type Error = serde_json::Error;
+impl TryFrom<JsonValue> for Model {
+    type Error = serde_json::Error;
 
-//     fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
-//         serde_json::from_value(value)
-//     }
-// }
+    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
+        serde_json::from_value(value)
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

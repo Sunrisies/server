@@ -1,7 +1,7 @@
 use actix_web::web;
 
 use crate::routes::user::{delete_demo, get_demo, get_demo_uuid};
-use crate::routes::{echo, post_demo};
+use crate::routes::{echo, post_demo, sse};
 
 pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -14,6 +14,7 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                     // .route("/{uuid:.*}", web::put().to(put_demo))
                     .route("/{uuid:.*}", web::delete().to(delete_demo)),
             )
-            .service(web::scope("/ws").route("", web::get().to(echo))),
+            .service(web::scope("/ws").route("", web::get().to(echo)))
+            .service(web::scope("/sse").route("/stream", web::get().to(sse::sse_stream))),
     );
 }

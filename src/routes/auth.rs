@@ -7,7 +7,7 @@ use validator::Validate;
 
 use crate::config::AppError;
 use crate::dto::user::ValidationErrorJson;
-use crate::{ApiResponse, HttpResult};
+use crate::{ApiResponse, HttpResult, SseNotifier};
 use crate::{
     RegisterResponse,
     user::{self},
@@ -17,6 +17,7 @@ use crate::{
 pub async fn post_demo(
     db_pool: web::Data<DatabaseConnection>,
     user_data: web::Json<RegisterResponse>,
+    notifier: web::Data<SseNotifier>,
 ) -> HttpResult {
     // 校验
     if let Err(errors) = user_data.validate() {
@@ -41,9 +42,22 @@ pub async fn post_demo(
         ..Default::default()
     };
     match new_user.insert(db_pool.as_ref()).await {
-        Ok(_) => println!("User created successfully"),
+        Ok(user) => {
+            println!("User created successfully: {:?}", user);
+            let notification = serde_json::json!({
+                "event": "user_updated",
+                "data": {
+                    "user_id": user.id,
+                    "updated_fields": {
+                        "username": &user.user_name,
+                    }
+                }
+            });
+            notifier.notify(&notification.to_string());
+        }
         Err(e) => println!("Error creating user: {}", e),
     }
     println!("Database connected");
+
     Ok(ApiResponse::success("添加成功", "添加成功").to_http_response())
 }
