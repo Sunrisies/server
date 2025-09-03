@@ -11,6 +11,7 @@ async fn main() -> Result<()> {
     let db_pool = web::Data::new(db);
     // 添加sse
     let notifier = web::Data::new(SseNotifier::new());
+    println!("Server running on http://127.0.0.1:2345");
     let _ = HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://127.0.0.1:5502")
