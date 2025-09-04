@@ -6,7 +6,8 @@ use uuid::Uuid;
 
 use crate::dto::PaginationQuery;
 use crate::dto::user::UpdateUserRequest;
-use crate::user::{self, Entity as UserEntity};
+use crate::models::users::{self, Entity as UserEntity};
+// use crate::{self, Entity as UserEntity};
 // 获取
 pub async fn get_demo(
     db_pool: web::Data<DatabaseConnection>,
@@ -14,7 +15,7 @@ pub async fn get_demo(
 ) -> impl Responder {
     let PaginationQuery { page, limit } = query.into_inner();
 
-    match user::Entity::find()
+    match users::Entity::find()
         .limit(limit.unwrap_or(10).min(100))
         .offset((page.unwrap_or(1) - 1) * limit.unwrap_or(10).min(100))
         .all(db_pool.as_ref())
@@ -51,7 +52,7 @@ pub async fn _put_demo(
     };
     let existing_user = existing_user
         .ok_or_else(|| HttpResponse::NotFound().json(format!("ID为{}的用户不存在", uuid)))?;
-    let mut user_active: user::ActiveModel = existing_user.into();
+    let mut user_active: users::ActiveModel = existing_user.into();
     user_active.user_name = Set(user_data.user_name.to_string());
     user_active.image = Set(user_data.image.clone());
     user_active.updated_at = Set(Utc::now());

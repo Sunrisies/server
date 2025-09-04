@@ -5,13 +5,11 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection};
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::RegisterResponse;
 use crate::config::AppError;
 use crate::dto::user::ValidationErrorJson;
+use crate::models::users::ActiveModel;
 use crate::{ApiResponse, HttpResult, SseNotifier};
-use crate::{
-    RegisterResponse,
-    user::{self},
-};
 
 // 新增
 pub async fn post_demo(
@@ -32,7 +30,7 @@ pub async fn post_demo(
     } = user_data.into_inner();
     println!("Validated user data: {:?}", user_name);
     println!("Validated user data: {:?}", pass_word);
-    let new_user = user::ActiveModel {
+    let new_user = ActiveModel {
         user_name: Set(user_name.to_string()),
         pass_word: Set(pass_word.to_string()),
         permissions: Set(Some("33333".to_string())), // 设置默认权限

@@ -24,7 +24,16 @@ pub struct Model {
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::posts::Entity")]
+    Posts,
+}
+
+impl Related<super::posts::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Posts.def()
+    }
+}
 
 impl Entity {
     // 添加按UUID查询的方法

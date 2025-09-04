@@ -1,7 +1,7 @@
-pub mod routes;
+mod routes;
 pub use routes::config_routes;
 pub mod models;
-pub use models::*;
+pub use models::prelude;
 pub mod config;
 pub use config::create_db_pool;
 pub mod dto;
@@ -10,3 +10,5 @@ pub mod middleware;
 pub use middleware::helpers::*;
 pub mod utils;
 pub use utils::sse::*;
+pub mod services;
+pub use services::*;
