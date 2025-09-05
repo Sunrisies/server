@@ -23,6 +23,7 @@ async fn main() -> Result<()> {
             .app_data(db_pool.clone())
             .app_data(notifier.clone())
             .configure(config_routes)
+            .wrap(actix_web::middleware::Logger::default())
             .wrap(cors)
     })
     .bind(("0.0.0.0", 2345))?

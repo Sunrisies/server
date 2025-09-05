@@ -6,3 +6,4 @@ pub use ws::echo;
 pub mod sse;
 pub use sse::sse_stream;
 pub mod category;
+pub use category::*;

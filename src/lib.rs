@@ -12,3 +12,5 @@ pub mod utils;
 pub use utils::sse::*;
 pub mod services;
 pub use services::*;
+pub mod handlers;
+pub use handlers::category;

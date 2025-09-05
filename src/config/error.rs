@@ -1,5 +1,4 @@
 use actix_web::{HttpResponse, ResponseError};
-// use diesel::result::Error as DieselError;
 use serde::Serialize;
 use std::fmt;
 
@@ -166,19 +165,9 @@ impl ResponseError for AppError {
 }
 
 // 从 Diesel 错误转换
-// impl From<DbErr> for AppError {
-//     fn from(error: DbErr) -> Self {
-//         match error {
-//             DbErr::NotFound => AppError::NotFound("Database record not found".to_string()),
-//             DbErr::DatabaseError(_, info) => {
-//                 if info.message().contains("duplicate key") {
-//                     AppError::AlreadyExists("Record already exists".to_string())
-//                 } else {
-//                     AppError::DatabaseError(info.message().to_string())
-//                 }
-//             }
-//             _ => AppError::DatabaseError(error.to_string()),
-//         }
+// impl From<anyhow::Error> for AppError {
+//     fn from(err: anyhow::Error) -> Self {
+//         AppError::DatabaseError(err.to_string())
 //     }
 // }
 
