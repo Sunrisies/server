@@ -1,3 +1,4 @@
+use crate::config::AppError;
 use crate::dto::PaginationQuery;
 use crate::models::categories::Model as CategoryModel;
 use crate::services::CategoryService;
@@ -29,9 +30,20 @@ pub async fn create_category(
     };
 
     // 调用服务创建分类
-    let category = CategoryService::create(&db_pool, category_model).await;
+    match CategoryService::create(&db_pool, category_model).await {
+        Ok(category) => Ok(ApiResponse::success(category, "添加成功").to_http_response()),
+        Err(AppError::DatabaseConnectionError(msg)) => {
+            // 统一包装：HTTP 200，业务码 200，message 提示不存在
+            Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+        }
+        Err(e) => {
+            // 其他错误（数据库等）按原样返回 500/400 等
+            Ok(ApiResponse::from(e).to_http_response())
+        }
+    }
     // 返回成功响应
-    Ok(ApiResponse::success(category, "添加成功").to_http_response())
+    // macth/
+    // Ok(ApiResponse::success(category, "添加成功").to_http_response())
 }
 
 // 获取所有分类的处理器
@@ -50,8 +62,17 @@ pub async fn get_category_by_id(
     db_pool: web::Data<DatabaseConnection>,
     id: web::Path<i32>,
 ) -> HttpResult {
-    let category = CategoryService::find_by_id(&db_pool, *id).await?;
-    Ok(ApiResponse::success(category, "获取成功").to_http_response())
+    match CategoryService::find_by_id(&db_pool, *id).await {
+        Ok(category) => Ok(ApiResponse::success(category, "获取成功").to_http_response()),
+        Err(AppError::NotFound(msg)) => {
+            // 统一包装：HTTP 200，业务码 200，message 提示不存在
+            Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+        }
+        Err(e) => {
+            // 其他错误（数据库等）按原样返回 500/400 等
+            Ok(ApiResponse::from(e).to_http_response())
+        }
+    }
 }
 
 // // 更新分类的处理器
@@ -89,14 +110,10 @@ pub async fn delete_category(
     // 检查分类是否存在
     let category = match CategoryService::find_by_id(&db_pool, *id).await {
         Ok(c) => c,
-        Err(e) => {
-            println!("删除文件{}", e);
-            return Err(e);
-        }
+        Err(e) => return Ok(ApiResponse::from(e).to_http_response()),
     };
 
+    let res = CategoryService::delete(&category, &db_pool).await?;
     // 调用服务删除分类
-    let sl = CategoryService::delete(&category, &db_pool).await?;
-
-    Ok(sl)
+    Ok(res)
 }

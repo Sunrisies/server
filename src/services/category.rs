@@ -3,6 +3,7 @@ use crate::{
     config::AppError,
     dto::PaginatedResp,
     models::categories::{self},
+    utils::db_err_map,
 };
 use sea_orm::{DatabaseConnection, PaginatorTrait, entity::*};
 
@@ -22,7 +23,7 @@ impl CategoryService {
         };
         let model = active_model.insert(db).await.map_err(|e| {
             println!("添加分类失败: {}", e);
-            AppError::DatabaseConnectionError(format!("添加分类失败: {}", e))
+            AppError::DatabaseConnectionError(db_err_map(e).to_owned())
         })?;
 
         Ok(model)
@@ -116,13 +117,12 @@ impl CategoryService {
 
     // 删除分类
     pub async fn delete(category: &categories::Model, db: &DatabaseConnection) -> HttpResult {
-        // 2. 执行删除
         match category.clone().delete(db).await {
             Ok(_res) => Ok(ApiResponse::<()>::success_msg("分类已删除").to_http_response()),
             Err(e) => {
                 println!("删除分类失败: {}", e);
                 Ok(
-                    ApiResponse::from(AppError::DatabaseConnectionError("删除失败".to_string()))
+                    ApiResponse::from(AppError::DatabaseConnectionError(db_err_map(e).to_owned()))
                         .to_http_response(),
                 )
             }
