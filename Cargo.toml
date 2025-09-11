@@ -18,6 +18,8 @@ dotenvy = "0.15.7"
 futures-util = "0.3.31"
 jsonwebtoken = "9.3.1"
 log = "0.4.27"
+log4rs = "1.4.0"
+nu-ansi-term = "0.50.1"
 sea-orm = { version = "1.1.14", features = [
     "sqlx-postgres",
     'runtime-tokio-rustls',

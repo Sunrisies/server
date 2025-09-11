@@ -1,9 +1,10 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, web};
 use anyhow::{Context, Result};
-use server::{SseNotifier, config_routes, create_db_pool};
+use server::{SseNotifier, config::init_logger, config_routes, create_db_pool};
 #[actix_web::main]
 async fn main() -> Result<()> {
+    init_logger(); // 初始化日志
     let db = create_db_pool()
         .await
         .context("Failed to connect to database")?;
