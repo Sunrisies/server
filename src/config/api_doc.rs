@@ -1,4 +1,4 @@
-use crate::services::auth;
+use crate::handlers::auth;
 use crate::services::users;
 use std::fs::File;
 use std::io::Write;
