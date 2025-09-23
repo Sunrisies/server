@@ -1,8 +1,8 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use validator::{Validate, ValidationErrors};
-
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct LoginRequest {
     #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
@@ -11,20 +11,20 @@ pub struct LoginRequest {
     pub pass_word: String,
 }
 
-#[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Validate, Debug, Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RegisterResponse {
     #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
     pub user_name: String,
     #[validate(length(min = 6, max = 100, message = "密码长度必须在6到100之间"))]
     pub pass_word: String,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct ValidationErrorItem {
     pub name: String,
     pub error: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, ToSchema)]
 pub struct ValidationErrorJson {
     // 字段名 -> 错误消息数组
     pub errors: Vec<ValidationErrorItem>,

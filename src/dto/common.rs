@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use utoipa::IntoParams;
 use validator::Validate;
 
 // 统一分页响应
@@ -10,7 +11,7 @@ pub struct PaginatedResp<T: Serialize> {
     pub total: u64,
 }
 
-#[derive(Validate, Debug, Clone, Serialize, Deserialize)]
+#[derive(Validate, Debug, Serialize, Deserialize, IntoParams)]
 pub struct PaginationQuery {
     #[validate(range(min = 1, message = "页码必须大于1"))]
     pub page: Option<u64>,

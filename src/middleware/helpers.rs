@@ -1,10 +1,11 @@
 use actix_web::HttpResponse;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{config::AppError, dto::user::ValidationErrorJson};
 
 /// 统一的API响应结构
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, ToSchema)]
 pub struct ApiResponse<T>
 where
     T: Serialize,

@@ -1,7 +1,11 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, web};
 use anyhow::{Context, Result};
-use server::{SseNotifier, config::init_logger, config_routes, create_db_pool};
+use server::{
+    SseNotifier,
+    config::{init_logger, write_to_file},
+    config_routes, create_db_pool,
+};
 #[actix_web::main]
 async fn main() -> Result<()> {
     init_logger(); // 初始化日志
@@ -12,6 +16,7 @@ async fn main() -> Result<()> {
     let db_pool = web::Data::new(db);
     // 添加sse
     let notifier = web::Data::new(SseNotifier::new());
+    write_to_file(); // api_doc生成文件
     println!("Server running on http://127.0.0.1:2345");
     let _ = HttpServer::new(move || {
         let cors = Cors::default()

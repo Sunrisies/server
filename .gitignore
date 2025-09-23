@@ -5,3 +5,4 @@ migration
 change-commit-date.sh
 /out
 /logs
+openapi.json

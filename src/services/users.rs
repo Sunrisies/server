@@ -7,7 +7,16 @@ use uuid::Uuid;
 use crate::dto::PaginationQuery;
 use crate::dto::user::UpdateUserRequest;
 use crate::models::users::{self, Entity as UserEntity};
-// 获取
+/// 获取用户列表
+#[utoipa::path(
+    get,
+    path = "/api/v1/users",
+    params(PaginationQuery),
+    responses(
+        (status = 200, description = "成功", body = String),
+    )
+)]
+
 pub async fn get_users(
     db_pool: web::Data<DatabaseConnection>,
     query: web::Query<PaginationQuery>,
@@ -64,6 +73,14 @@ pub async fn _put_demo(
 }
 
 // 删除
+#[utoipa::path(
+    post,
+    summary = "删除指定用户",
+    path = "/api/v1/users/{uuid}",
+    responses(
+        (status = 200, description = "删除成功", body = String),
+    ),
+)]
 pub async fn delete_user_uuid(
     db: web::Data<DatabaseConnection>,
     uuid: web::Path<String>,
@@ -97,6 +114,14 @@ pub async fn delete_user_uuid(
 }
 
 // 获取单个
+#[utoipa::path(
+    post,
+    summary = "获取单个用户信息",
+    path = "/api/v1/users/{uuid}",
+    responses(
+        (status = 200, description = "获取成功", body = String),
+    ),
+)]
 pub async fn get_user_uuid(uuid: web::Path<String>) -> impl Responder {
     format!("获取 uuid:{:?}!", uuid)
 }

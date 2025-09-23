@@ -12,6 +12,16 @@ use crate::models::users::ActiveModel;
 use crate::{ApiResponse, HttpResult, SseNotifier};
 
 // 注册
+#[utoipa::path(
+    post,
+    summary = "注册",
+    path = "/api/v1/auth/register",
+    request_body( content = RegisterResponse),
+    responses(
+        (status = 200, description = "添加成功", body = RegisterResponse),
+        (status = 422,description = "校验失败", body = ApiResponse<ValidationErrorJson> )
+    ),
+)]
 pub async fn register(
     db_pool: web::Data<DatabaseConnection>,
     user_data: web::Json<RegisterResponse>,
@@ -20,9 +30,7 @@ pub async fn register(
     // 校验
     if let Err(errors) = user_data.validate() {
         let msg = ValidationErrorJson::from_validation_errors(&errors);
-        println!("Validation errors:-- {:?}", msg);
         return Ok(ApiResponse::from(AppError::ValidationError(msg)).to_http_response());
-        // return Err(AppError::BadRequest(msg.to_string()));
     }
     let RegisterResponse {
         user_name,
