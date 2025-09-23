@@ -15,7 +15,7 @@ pub async fn create_db_pool() -> Result<DatabaseConnection, DbErr> {
         .acquire_timeout(Duration::from_secs(8))
         .idle_timeout(Duration::from_secs(8))
         .max_lifetime(Duration::from_secs(8))
-        // .sqlx_logging(false)
+        .sqlx_logging(false)
         .test_before_acquire(true)
         .set_schema_search_path("public")
         // .sqlx_logging(true) // 启用 SQL 日志记录，便于调试

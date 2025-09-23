@@ -3,19 +3,19 @@ use actix_web::web;
 use crate::{
     echo,
     handlers::category::{create_category, delete_category, get_categories, get_category_by_id},
-    post_demo, sse_stream,
-    users::{delete_demo, get_demo, get_demo_uuid},
+    register, sse_stream,
+    users::{delete_user_uuid, get_user_uuid, get_users},
 };
 pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
-            .service(web::scope("/v1/auth").route("/", web::post().to(post_demo)))
+            .service(web::scope("/v1/auth/register").route("", web::post().to(register)))
             .service(
                 web::scope("/v1/users")
-                    .route("/", web::get().to(get_demo))
-                    .route("/{uuid:.*}", web::get().to(get_demo_uuid))
+                    .route("", web::get().to(get_users))
+                    .route("/{uuid:.*}", web::get().to(get_user_uuid))
                     // .route("/{uuid:.*}", web::put().to(put_demo))
-                    .route("/{uuid:.*}", web::delete().to(delete_demo)),
+                    .route("/{uuid:.*}", web::delete().to(delete_user_uuid)),
             )
             .service(web::scope("/ws").route("", web::get().to(echo)))
             .service(web::scope("/sse").route("/stream", web::get().to(sse_stream)))

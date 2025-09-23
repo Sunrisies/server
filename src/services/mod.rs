@@ -1,6 +1,6 @@
 pub mod auth;
 pub mod users;
-pub use auth::post_demo;
+pub use auth::register;
 pub mod ws;
 pub use ws::echo;
 pub mod sse;

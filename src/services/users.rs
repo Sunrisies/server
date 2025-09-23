@@ -7,9 +7,8 @@ use uuid::Uuid;
 use crate::dto::PaginationQuery;
 use crate::dto::user::UpdateUserRequest;
 use crate::models::users::{self, Entity as UserEntity};
-// use crate::{self, Entity as UserEntity};
 // 获取
-pub async fn get_demo(
+pub async fn get_users(
     db_pool: web::Data<DatabaseConnection>,
     query: web::Query<PaginationQuery>,
 ) -> impl Responder {
@@ -65,7 +64,7 @@ pub async fn _put_demo(
 }
 
 // 删除
-pub async fn delete_demo(
+pub async fn delete_user_uuid(
     db: web::Data<DatabaseConnection>,
     uuid: web::Path<String>,
 ) -> impl Responder {
@@ -98,6 +97,6 @@ pub async fn delete_demo(
 }
 
 // 获取单个
-pub async fn get_demo_uuid(uuid: web::Path<String>) -> impl Responder {
+pub async fn get_user_uuid(uuid: web::Path<String>) -> impl Responder {
     format!("获取 uuid:{:?}!", uuid)
 }

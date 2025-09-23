@@ -11,8 +11,8 @@ use crate::dto::user::ValidationErrorJson;
 use crate::models::users::ActiveModel;
 use crate::{ApiResponse, HttpResult, SseNotifier};
 
-// 新增
-pub async fn post_demo(
+// 注册
+pub async fn register(
     db_pool: web::Data<DatabaseConnection>,
     user_data: web::Json<RegisterResponse>,
     notifier: web::Data<SseNotifier>,

@@ -4,3 +4,4 @@ migration
 *.env
 change-commit-date.sh
 /out
+/logs
