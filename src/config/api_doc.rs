@@ -21,6 +21,7 @@ use utoipa::OpenApi;
     paths(
         // 权限模块的
         auth::register, // 注册
+        auth::login, // 登录
         users::get_users, // 获取用户列表
         users::get_user_uuid, // 获取单个用户
         users::delete_user_uuid, // 删除用户

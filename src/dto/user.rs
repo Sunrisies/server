@@ -1,15 +1,93 @@
-use std::fmt;
-
+use lazy_static::lazy_static;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use utoipa::ToSchema;
 use validator::{Validate, ValidationErrors};
-#[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
-pub struct LoginRequest {
-    #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
-    pub user_name: String,
-    #[validate(length(min = 6, max = 100, message = "密码长度必须在6到100之间"))]
-    pub pass_word: String,
+// ------------------ 独立变体结构体 ------------------
+#[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
+pub struct PasswordLogin {
+    #[validate(length(min = 1, max = 100))]
+    pub account: String,
+
+    #[validate(length(min = 6, max = 100))]
+    pub password: String,
 }
+
+#[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
+pub struct EmailLogin {
+    #[validate(email)]
+    pub email: String,
+
+    #[validate(length(min = 6, max = 6, message = "验证码格式错误"))]
+    #[schema(default = "123456")]
+    pub code: String,
+}
+
+#[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
+pub struct PhoneLogin {
+    #[validate(regex(path = "*RE_PHONE", message = "手机号格式错误"))]
+    pub phone: String,
+
+    #[validate(length(min = 6, max = 6, message = "验证码格式错误"))]
+    #[schema(default = "123456")]
+    pub code: String,
+}
+
+#[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
+pub struct OAuthLogin {
+    #[validate(length(min = 1))]
+    pub provider: String,
+
+    #[validate(length(min = 1))]
+    pub openid: String,
+
+    #[validate(length(min = 1))]
+    pub access_token: String,
+}
+
+// ------------------ 枚举只做分发 ------------------
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[serde(tag = "login_type")]
+pub enum LoginRequest {
+    #[serde(rename = "password")]
+    Password(PasswordLogin),
+
+    #[serde(rename = "email")]
+    Email(EmailLogin),
+
+    #[serde(rename = "phone")]
+    Phone(PhoneLogin),
+
+    #[serde(rename = "oauth")]
+    OAuth(OAuthLogin),
+}
+
+/* 统一校验入口 */
+impl LoginRequest {
+    pub fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        match self {
+            LoginRequest::Password(v) => v.validate(),
+            LoginRequest::Email(v) => v.validate(),
+            LoginRequest::Phone(v) => v.validate(),
+            LoginRequest::OAuth(v) => v.validate(),
+        }
+    }
+}
+// 手机号正则
+lazy_static! {
+    static ref RE_PHONE: Regex = Regex::new(r"^1[3-9]\d{9}$").unwrap();
+}
+// #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
+// pub struct LoginRequest {
+//     #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
+//     pub user_name: String,
+//     #[validate(length(min = 6, max = 100, message = "密码长度必须在6到100之间"))]
+//     pub pass_word: String,
+//    /// 登录类型，一般登录,邮箱登录,手机号登录,第三方登录
+//    #[validate()]
+//     pub login_type: String,
+// }
 
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RegisterResponse {

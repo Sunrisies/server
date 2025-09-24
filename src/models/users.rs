@@ -56,6 +56,10 @@ impl Entity {
             .await?;
         Ok(result)
     }
+    // 根据用户名称查询
+    pub fn find_by_name(user_name: &str) -> Select<Entity> {
+        Self::find().filter(Column::UserName.eq(user_name))
+    }
 }
 
 impl From<Model> for JsonValue {

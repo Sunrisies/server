@@ -1,6 +1,7 @@
 use actix_web::web;
 
 use crate::{
+    auth::login,
     echo,
     handlers::{create_category, delete_category, get_categories, get_category_by_id, register},
     sse_stream,
@@ -9,7 +10,11 @@ use crate::{
 pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api")
-            .service(web::scope("/v1/auth/register").route("", web::post().to(register)))
+            .service(
+                web::scope("/v1/auth")
+                    .route("/register", web::post().to(register))
+                    .route("/login", web::post().to(login)),
+            )
             .service(
                 web::scope("/v1/users")
                     .route("", web::get().to(get_users))
