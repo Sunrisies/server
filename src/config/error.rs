@@ -172,8 +172,8 @@ impl From<std::io::Error> for AppError {
     }
 }
 
-impl From<argon2::Error> for AppError {
-    fn from(error: argon2::Error) -> Self {
+impl From<argon2::password_hash::Error> for AppError {
+    fn from(error: argon2::password_hash::Error) -> Self {
         AppError::EncryptionError(format!("Password hashing error: {}", error))
     }
 }

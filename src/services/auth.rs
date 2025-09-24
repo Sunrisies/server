@@ -10,6 +10,7 @@ use crate::SseNotifier;
 use crate::config::AppError;
 use crate::dto::user::ValidationErrorJson;
 use crate::models::users::ActiveModel;
+use crate::utils::hash;
 pub struct AuthService;
 
 impl AuthService {
@@ -27,11 +28,10 @@ impl AuthService {
             user_name,
             pass_word,
         } = user_data.into_inner();
-        println!("Validated user data: {:?}", user_name);
-        println!("Validated user data: {:?}", pass_word);
+        let password_hash = hash(&pass_word)?;
         let new_user = ActiveModel {
             user_name: Set(user_name.to_string()),
-            pass_word: Set(pass_word.to_string()),
+            pass_word: Set(password_hash),
             permissions: Set(Some("33333".to_string())), // 设置默认权限
             uuid: Set(Uuid::new_v4().to_string()),       // 生成唯一的UUID
             created_at: Set(Utc::now()),
