@@ -1,7 +1,7 @@
+use crate::utils::fmt_beijing;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
 #[sea_orm(table_name = "categories")]
 pub struct Model {
@@ -13,9 +13,11 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     #[schema(value_type = String, format = DateTime)]
+    #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
 
     #[schema(value_type = String, format = DateTime)]
+    #[serde(serialize_with = "fmt_beijing")]
     pub updated_at: DateTimeUtc,
 }
 

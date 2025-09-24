@@ -1,3 +1,4 @@
+use crate::utils::fmt_beijing;
 use sea_orm::{DeleteResult, entity::prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -10,7 +11,8 @@ pub struct Model {
     pub uuid: String, // 用户UUID
     #[sea_orm(unique)]
     pub user_name: String, // 用户名
-    pub pass_word: String,           // 密码
+    #[serde(skip_serializing)] // ✅ 通用、最简单 跳过序列化
+    pub pass_word: String, // 密码
     pub email: Option<String>,       // 邮箱
     pub image: Option<String>,       // 头像
     pub phone: Option<String>,       // 手机号
@@ -18,8 +20,10 @@ pub struct Model {
     pub permissions: Option<String>, // 权限
     pub binding: Option<String>,     // authentication绑定
     #[sea_orm(default_value_t = DateTimeUtc::default())]
+    #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
     #[sea_orm(default_value_t = DateTimeUtc::default())]
+    #[serde(serialize_with = "fmt_beijing")]
     pub updated_at: DateTimeUtc,
 }
 

@@ -22,7 +22,7 @@ pub async fn register(
     notifier: web::Data<SseNotifier>,
 ) -> HttpResult {
     match AuthService::register(db_pool, user_data, notifier).await {
-        Ok(_user) => Ok(ApiResponse::success("user", "user").to_http_response()),
+        Ok(user) => Ok(ApiResponse::success(user, "添加用户成功").to_http_response()),
         Err(e) => Ok(ApiResponse::from(e).to_http_response()),
     }
 }

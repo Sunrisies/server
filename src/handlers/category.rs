@@ -14,10 +14,11 @@ use validator::Validate;
     post,
     summary = "创建分类",
     path = "/api/v1/categories",
+    tag = "分类",
     request_body( content = CreateCategoryRequest),
     responses(
-        // (status = 200, description = "添加成功", body = CategoryModel),
-        // (status = 422,description = "校验失败", body = ApiResponse<ValidationErrorJson> )
+        (status = 200, description = "添加成功", body = ApiResponse<CategoryModel>),
+        (status = 422,description = "校验失败", body = ApiResponse<ValidationErrorJson> )
     ),
 )]
 pub async fn create_category(
@@ -46,14 +47,12 @@ pub async fn create_category(
             Ok(ApiResponse::from(e).to_http_response())
         }
     }
-    // 返回成功响应
-    // macth/
-    // Ok(ApiResponse::success(category, "添加成功").to_http_response())
 }
 // 获取所有分类
 #[utoipa::path(
     get,
     summary = "获取所有分类",
+    tag = "分类",
     path = "/api/v1/categories",
     params( PaginationQuery  ),
     responses(
