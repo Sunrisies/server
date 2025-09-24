@@ -1,20 +1,25 @@
 use crate::config::AppError;
-use crate::dto::PaginationQuery;
+use crate::dto::category::CreateCategoryRequest;
+use crate::dto::user::ValidationErrorJson;
+use crate::dto::{PaginatedResp, PaginationQuery};
 use crate::models::categories::Model as CategoryModel;
 use crate::services::CategoryService;
 use crate::{ApiResponse, HttpResult};
 use actix_web::web;
 use sea_orm::DatabaseConnection;
-use serde::Deserialize;
-// 创建分类的请求体
-#[derive(Deserialize)]
-pub struct CreateCategoryRequest {
-    pub name: String,
-    pub slug: String,
-    pub description: Option<String>,
-}
+use validator::Validate;
 
-// 创建分类的处理器
+/// 创建分类
+#[utoipa::path(
+    post,
+    summary = "创建分类",
+    path = "/api/v1/categories",
+    request_body( content = CreateCategoryRequest),
+    responses(
+        // (status = 200, description = "添加成功", body = CategoryModel),
+        // (status = 422,description = "校验失败", body = ApiResponse<ValidationErrorJson> )
+    ),
+)]
 pub async fn create_category(
     db_pool: web::Data<DatabaseConnection>,
     form: web::Json<CreateCategoryRequest>,
@@ -45,15 +50,27 @@ pub async fn create_category(
     // macth/
     // Ok(ApiResponse::success(category, "添加成功").to_http_response())
 }
-
-// 获取所有分类的处理器
+// 获取所有分类
+#[utoipa::path(
+    get,
+    summary = "获取所有分类",
+    path = "/api/v1/categories",
+    params( PaginationQuery  ),
+    responses(
+        (status = 200, description = "获取成功", body = ApiResponse<PaginatedResp<CategoryModel>>),
+        (status = 422,description = "校验失败", body = ApiResponse<ValidationErrorJson> )
+    ),
+)]
 pub async fn get_categories(
     db_pool: web::Data<DatabaseConnection>,
     query: web::Query<PaginationQuery>,
 ) -> HttpResult {
-    let page = query.page.unwrap_or(1);
-    let limit = query.limit.unwrap_or(10);
-    let categories = CategoryService::find_all(&db_pool, page, limit).await?;
+    if let Err(errors) = query.validate() {
+        log::error!("get_categories Validation errors: {:?}", errors);
+        let msg = ValidationErrorJson::from_validation_errors(&errors);
+        return Ok(ApiResponse::from(AppError::ValidationError(msg)).to_http_response());
+    }
+    let categories = CategoryService::find_all(&db_pool, query.page, query.limit).await?;
     Ok(categories)
 }
 

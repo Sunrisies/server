@@ -23,6 +23,6 @@ pub async fn register(
 ) -> HttpResult {
     match AuthService::register(db_pool, user_data, notifier).await {
         Ok(_user) => Ok(ApiResponse::success("user", "user").to_http_response()),
-        Err(e) => Err(e),
+        Err(e) => Ok(ApiResponse::from(e).to_http_response()),
     }
 }

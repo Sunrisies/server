@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use utoipa::IntoParams;
+use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
 // 统一分页响应
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct PaginatedResp<T: Serialize> {
     pub data: Vec<T>,
     pub page: u64,
@@ -12,10 +12,22 @@ pub struct PaginatedResp<T: Serialize> {
 }
 
 #[derive(Validate, Debug, Serialize, Deserialize, IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
 pub struct PaginationQuery {
+    /// 页码
     #[validate(range(min = 1, message = "页码必须大于1"))]
-    pub page: Option<u64>,
-    // 每页数量不能超过100
+    #[serde(default = "default_page")]
+    #[param(example = json!(1))]
+    pub page: u64,
+    /// 每页数量
     #[validate(range(max = 10, message = "每页数量不能超过100"))]
-    pub limit: Option<u64>,
+    #[serde(default = "default_limit")]
+    #[param(example = json!(10))]
+    pub limit: u64,
+}
+fn default_page() -> u64 {
+    1
+}
+fn default_limit() -> u64 {
+    10
 }

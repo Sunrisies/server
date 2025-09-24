@@ -24,8 +24,8 @@ pub async fn get_users(
     let PaginationQuery { page, limit } = query.into_inner();
 
     match users::Entity::find()
-        .limit(limit.unwrap_or(10).min(100))
-        .offset((page.unwrap_or(1) - 1) * limit.unwrap_or(10).min(100))
+        .limit(limit)
+        .offset((page - 1) * limit)
         .all(db_pool.as_ref())
         .await
     {

@@ -68,7 +68,7 @@ impl CategoryService {
                 .to_http_response());
             }
         };
-
+        log::info!("data:{:?}", data);
         // 3. 组装成前端需要的分页结构
         let resp = PaginatedResp {
             data,

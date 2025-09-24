@@ -91,13 +91,7 @@ impl fmt::Display for AppError {
             AppError::TokenExpired(msg) => write!(f, "令牌已过期: {}", msg),
             AppError::TokenInvalid(msg) => write!(f, "无效的令牌: {}", msg),
             AppError::BadRequest(msg) => write!(f, "错误的请求: {}", msg),
-            // AppError::ValidationError(errors) => {
-            //     write!(f, "验证错误: ")?;
-            //     for error in errors {
-            //         write!(f, "{} - {}; ", error.field, error.message)?;
-            //     }
-            //     Ok(())
-            // }
+
             AppError::ValidationError(error) => write!(f, "验证错误: {:?}", error),
             AppError::UnprocessableEntity(msg) => write!(f, "无法处理的实体: {}", msg),
             AppError::NotFound(msg) => write!(f, "未找到: {}", msg),
