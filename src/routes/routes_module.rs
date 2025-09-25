@@ -22,8 +22,8 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                     // .route("/{uuid:.*}", web::put().to(put_demo))
                     .route("/{uuid:.*}", web::delete().to(delete_user_uuid)),
             )
-            .service(web::scope("/ws").route("", web::get().to(echo)))
-            .service(web::scope("/sse").route("/stream", web::get().to(sse_stream)))
+            .service(web::scope("/v1/ws").route("", web::get().to(echo)))
+            .service(web::scope("/v1/sse").route("/stream", web::get().to(sse_stream)))
             .service(
                 web::scope("/v1/categories")
                     .route("", web::post().to(create_category))

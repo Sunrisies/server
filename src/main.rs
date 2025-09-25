@@ -5,6 +5,7 @@ use server::{
     SseNotifier,
     config::{init_logger, write_to_file},
     config_routes, create_db_pool,
+    middleware::auth::Auth,
 };
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -31,6 +32,7 @@ async fn main() -> Result<()> {
             .configure(config_routes)
             .wrap(actix_web::middleware::Logger::default())
             .wrap(cors)
+            .wrap(Auth)
     })
     .bind(("0.0.0.0", 2345))?
     .on_connect(move |conn, _addr| {
