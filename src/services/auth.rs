@@ -1,14 +1,17 @@
-use actix_web::web;
+use actix_web::cookie::{Cookie, SameSite, time::Duration as ActixDuration};
+use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection};
+use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
 use crate::config::AppError;
 use crate::dto::user::{EmailLogin, OAuthLogin, PasswordLogin, PhoneLogin, ValidationErrorJson};
 use crate::models::users::ActiveModel;
-use crate::utils::{hash, verify};
+use crate::utils::crypto_pwd::{hash, verify};
+use crate::utils::jwt::generate_jwt;
 use crate::{ApiResponse, SseNotifier};
 use crate::{HttpResult, RegisterResponse};
 pub struct AuthService;
@@ -77,7 +80,23 @@ impl AuthService {
         match verify(&login.password, user.pass_word.as_str()) {
             Ok(true) => {
                 // 登录成功
-                Ok(ApiResponse::success("user", "密码登录").to_http_response())
+                let token = generate_jwt(&user, "uZr0aHV8Z2dRa1NmYnJ0aXN0aGViZXN0a2V5", 3600)?;
+                log::info!("login_by_pwd token: {:?}", token);
+                // 2. 构造 Cookie
+                let cookie = Cookie::build("access_token", token)
+                    .http_only(true) // 防 XSS
+                    .same_site(SameSite::Strict) // 防 CSRF
+                    .secure(true) // 生产必须 true，本地可 false
+                    .max_age(ActixDuration::hours(1))
+                    .path("/") // 全局可用
+                    .finish();
+                Ok(HttpResponse::Ok()
+                    .cookie(cookie) // ← 关键：把 Cookie 塞进响应
+                    .json(json!({
+                        "code": 200,
+                        "message": "密码登录成功",
+                        "data":user
+                    })))
             }
             Ok(false) => {
                 // 登录失败
@@ -88,9 +107,6 @@ impl AuthService {
                 Err(AppError::Unauthorized(e.to_string()))
             }
         }
-
-        // log::info!("login_by_pwd{:?},{:?}", login, user);
-        // Ok(ApiResponse::success("user", "一般登录").to_http_response())
     }
     pub async fn login_by_email(
         _db_pool: web::Data<DatabaseConnection>,
