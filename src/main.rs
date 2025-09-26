@@ -4,13 +4,22 @@ use anyhow::{Context, Result};
 use server::{
     SseNotifier,
     config::{init_logger, write_to_file},
-    config_routes, create_db_pool,
+    config_routes, create_db_pool, get_all_routes, init_route_registry,
     middleware::auth::Auth,
     utils::perm_cache::load_perm_cache,
 };
 #[actix_web::main]
 async fn main() -> Result<()> {
     init_logger(); // 初始化日志
+    // 初始化路由注册表 - 这行很重要！
+    init_route_registry();
+
+    // 打印所有注册的路由（调试用）
+    let routes = get_all_routes();
+    log::info!("Registered {} routes:", routes.len());
+    for route in routes {
+        log::info!("  {} {} -> {}", route.method, route.path, route.permission);
+    }
     let db = create_db_pool()
         .await
         .context("Failed to connect to database")?;

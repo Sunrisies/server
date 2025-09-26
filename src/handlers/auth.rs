@@ -1,10 +1,11 @@
-use actix_web::web;
-use sea_orm::DatabaseConnection;
-
+use crate::RouteInfo;
 use crate::config::AppError;
 use crate::dto::user::{LoginRequest, ValidationErrorJson};
 use crate::{ApiResponse, HttpResult, SseNotifier};
 use crate::{AuthService, RegisterResponse};
+use actix_web::web;
+use route_macros::route_permission;
+use sea_orm::DatabaseConnection;
 
 // 注册
 #[utoipa::path(
@@ -19,6 +20,7 @@ use crate::{AuthService, RegisterResponse};
         (status = 422,description = "校验失败", body = ApiResponse<ValidationErrorJson> )
     ),
 )]
+#[route_permission(path = "/api/register", method = "post", permission = "auth:register")]
 pub async fn register(
     db_pool: web::Data<DatabaseConnection>,
     user_data: web::Json<RegisterResponse>,
@@ -44,6 +46,7 @@ pub async fn register(
         ),
 
 )]
+#[route_permission(path = "/api/login", method = "post", permission = "auth:login")]
 pub async fn login(
     db_pool: web::Data<DatabaseConnection>,
     login: web::Json<LoginRequest>,

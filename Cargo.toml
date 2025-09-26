@@ -38,7 +38,8 @@ tokio-stream = { version = "0.1.17", features = ["sync"] }
 utoipa = "5.4.0"
 uuid = { version = "1.18.0", features = ["v4"] }
 validator = { version = "0.20.0", features = ["derive"] }
-
+route-macros = { path = "./route-macros" }
+inventory = "0.3.21"
 
 [profile.dev]
 opt-level = 0

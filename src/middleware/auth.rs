@@ -1,4 +1,4 @@
-use crate::utils::perm_cache::ROLE_PERMS;
+use crate::{get_all_routes, utils::perm_cache::ROLE_PERMS};
 use actix_web::{
     Error,
     dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
@@ -81,6 +81,16 @@ where
                             // 令牌有效，调用服务
                             let fut = self.service.call(req);
                             Box::pin(async move {
+                                let routes = get_all_routes();
+                                log::info!("Registered {} routes:", routes.len());
+                                for route in routes {
+                                    log::info!(
+                                        "  {} {} -> {}",
+                                        route.method,
+                                        route.path,
+                                        route.permission
+                                    );
+                                }
                                 let role_perms = ROLE_PERMS.read().await;
                                 if let Some(perms) = role_perms.get(&claims.role_id) {
                                     log::info!("perms: {:?}", perms);
