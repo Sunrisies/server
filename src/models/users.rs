@@ -13,12 +13,12 @@ pub struct Model {
     pub user_name: String, // 用户名
     #[serde(skip_serializing)] // ✅ 通用、最简单 跳过序列化
     pub pass_word: String, // 密码
-    pub email: Option<String>,       // 邮箱
-    pub image: Option<String>,       // 头像
-    pub phone: Option<String>,       // 手机号
-    pub role: Option<String>,        // 角色
-    pub permissions: Option<String>, // 权限
-    pub binding: Option<String>,     // authentication绑定
+    #[sea_orm(unique)]
+    pub email: Option<String>, // 邮箱
+    pub image: Option<String>, // 头像
+    #[sea_orm(unique)]
+    pub phone: Option<String>, // 手机号
+    pub binding: Option<String>, // authentication绑定
     #[sea_orm(default_value_t = DateTimeUtc::default())]
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
@@ -31,6 +31,10 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::posts::Entity")]
     Posts,
+    #[sea_orm(has_many = "super::user_permissions::Entity")]
+    UserPermissions,
+    #[sea_orm(has_many = "super::user_roles::Entity")]
+    UserRoles,
 }
 
 impl Related<super::posts::Entity> for Entity {

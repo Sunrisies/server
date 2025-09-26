@@ -58,8 +58,4 @@ pub async fn login(
         LoginRequest::Phone(p) => AuthService::login_by_phone(db_pool, p).await,
         LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o).await,
     }
-    // match AuthService::login(db_pool, user_data).await {
-    //     Ok(user) => Ok(ApiResponse::success(user, "登录成功").to_http_response()),
-    //     Err(e) => Ok(ApiResponse::from(e).to_http_response()),
-    // }
 }

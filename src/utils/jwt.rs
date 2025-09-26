@@ -1,10 +1,11 @@
+use crate::models::roles::{self};
+use crate::models::user_roles;
+use crate::{config::AppError, models::users::Model};
 use base64::engine::{Engine as _, general_purpose};
 use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
-
-use crate::{config::AppError, models::users::Model};
-
 type Seconds = u64;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -12,24 +13,55 @@ pub struct TokenClaims {
     pub user_uuid: String,
     pub user_name: String,
     pub exp: Seconds, // u64 更安全
-    pub permissions: Option<String>,
+    pub role_id: i32, //
 }
 
 impl TokenClaims {
-    fn from_user(user: &Model, ttl: Seconds) -> Self {
+    async fn from_user(
+        db_pool: &sea_orm::DatabaseConnection,
+        user: &Model,
+        ttl: Seconds,
+    ) -> Result<Self, AppError> {
         let exp = (Utc::now() + ChronoDuration::seconds(ttl as i64)).timestamp() as Seconds;
-        TokenClaims {
+        let role_id = Self::get_permission_codes(db_pool, user).await?;
+
+        Ok(TokenClaims {
             user_uuid: user.uuid.clone(),
             user_name: user.user_name.clone(),
             exp,
-            permissions: user.permissions.clone(),
-        }
+            role_id,
+        })
+    }
+    /// 获取权限码集合
+    async fn get_permission_codes(
+        db_pool: &sea_orm::DatabaseConnection,
+        user: &Model,
+    ) -> Result<i32, AppError> {
+        let roles = user_roles::Entity::find()
+            .filter(user_roles::Column::UserId.eq(user.id))
+            .find_with_related(roles::Entity)
+            .all(db_pool)
+            .await
+            .map_err(|e| AppError::DatabaseError(format!("Failed to get user roles: {}", e)))?;
+
+        // 生成角色哈希值
+        let role_ids: Vec<i32> = roles
+            .iter()
+            .flat_map(|(_, related_roles)| related_roles.iter().map(|role| role.id))
+            .collect();
+        Ok(role_ids[0])
     }
 }
 
 /// 生成 JWT
-pub fn generate_jwt(user: &Model, secret_b64: &str, ttl: Seconds) -> Result<String, AppError> {
-    let claims = TokenClaims::from_user(user, ttl);
+pub async fn generate_jwt(
+    db_pool: &sea_orm::DatabaseConnection,
+    user: &Model,
+    secret_b64: &str,
+    ttl: Seconds,
+) -> Result<String, AppError> {
+    let claims = TokenClaims::from_user(db_pool, user, ttl).await?;
+    log::info!("claims: {:?}", claims);
     encode(
         &Header::default(),
         &claims,

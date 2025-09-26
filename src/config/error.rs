@@ -159,11 +159,11 @@ impl ResponseError for AppError {
 }
 
 // 从 Diesel 错误转换
-// impl From<anyhow::Error> for AppError {
-//     fn from(err: anyhow::Error) -> Self {
-//         AppError::DatabaseError(err.to_string())
-//     }
-// }
+impl From<sea_orm::DbErr> for AppError {
+    fn from(err: sea_orm::DbErr) -> Self {
+        AppError::DatabaseError(err.to_string())
+    }
+}
 
 // 从其他常见错误类型转换
 impl From<std::io::Error> for AppError {

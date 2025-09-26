@@ -1,19 +1,21 @@
-use actix_web::cookie::{Cookie, SameSite, time::Duration as ActixDuration};
-use actix_web::{HttpResponse, web};
-use chrono::Utc;
-use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, DatabaseConnection};
-use serde_json::json;
-use uuid::Uuid;
-use validator::Validate;
-
 use crate::config::AppError;
 use crate::dto::user::{EmailLogin, OAuthLogin, PasswordLogin, PhoneLogin, ValidationErrorJson};
 use crate::models::users::ActiveModel;
+use crate::models::{roles, user_roles};
 use crate::utils::crypto_pwd::{hash, verify};
 use crate::utils::jwt::generate_jwt;
 use crate::{ApiResponse, SseNotifier};
 use crate::{HttpResult, RegisterResponse};
+use actix_web::cookie::{Cookie, SameSite, time::Duration as ActixDuration};
+use actix_web::{HttpResponse, web};
+use chrono::Utc;
+use sea_orm::ActiveValue::Set;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait,
+};
+use serde_json::json;
+use uuid::Uuid;
+use validator::Validate;
 pub struct AuthService;
 
 impl AuthService {
@@ -32,32 +34,60 @@ impl AuthService {
             pass_word,
         } = user_data.into_inner();
         let password_hash = hash(&pass_word)?;
-        let new_user = ActiveModel {
-            user_name: Set(user_name.to_string()),
+        // —— 1. 开事务 ——
+        let txn = db_pool
+            .begin()
+            .await
+            .map_err(|_| AppError::DatabaseError(String::from("Begin transaction failed")))?;
+
+        // —— 2. 插用户 ——
+        let user_am = ActiveModel {
+            user_name: Set(user_name.clone()),
             pass_word: Set(password_hash),
-            permissions: Set(Some("33333".to_string())), // 设置默认权限
-            uuid: Set(Uuid::new_v4().to_string()),       // 生成唯一的UUID
+            uuid: Set(Uuid::new_v4().to_string()),
             created_at: Set(Utc::now()),
             updated_at: Set(Utc::now()),
             ..Default::default()
         };
-        let user = match new_user.insert(db_pool.as_ref()).await {
-            Ok(user) => {
-                println!("User created successfully: {:?}", user);
-                let notification = serde_json::json!({
-                    "event": "user_updated",
-                    "data": {
-                        "user_id": user.id,
-                        "updated_fields": {
-                            "username": &user.user_name,
-                        }
-                    }
-                });
-                notifier.notify(&notification.to_string());
-                user
-            }
-            Err(e) => return Err(AppError::DatabaseError(e.to_string())),
+        let user = user_am
+            .insert(&txn)
+            .await
+            .map_err(|_| AppError::DatabaseError(String::from("Insert user failed")))?;
+
+        // —— 3. 查 VIEWER 角色 id ——
+        let viewer_role = roles::Entity::find()
+            .filter(roles::Column::Code.eq("SUPER_ADMIN"))
+            .one(&txn)
+            .await
+            .map_err(|_| AppError::DatabaseError("VIEWER role not found".into()))?
+            .ok_or_else(|| AppError::DatabaseError("VIEWER role not found".into()))?;
+
+        // —— 4. 绑角色（is_primary = true） ——
+        let user_role_am = user_roles::ActiveModel {
+            user_id: Set(Some(user.id)),
+            role_id: Set(Some(viewer_role.id)),
+            is_primary: Set(Some(true)),
+            created_at: Set(Utc::now()),
+            ..Default::default()
         };
+        user_role_am
+            .insert(&txn)
+            .await
+            .map_err(|_| AppError::DatabaseError("Insert user role failed".into()))?;
+
+        // —— 5. 提交事务 ——
+        txn.commit()
+            .await
+            .map_err(|_| AppError::DatabaseError("Commit transaction failed".into()))?;
+        // —— 6. 原通知逻辑保持不动 ——
+        let notification = serde_json::json!({
+            "event": "user_updated",
+            "data": {
+                "user_id": user.id,
+                "updated_fields": { "username": &user.user_name }
+            }
+        });
+        notifier.notify(&notification.to_string());
         Ok(user)
     }
 
@@ -80,7 +110,13 @@ impl AuthService {
         match verify(&login.password, user.pass_word.as_str()) {
             Ok(true) => {
                 // 登录成功
-                let token = generate_jwt(&user, "uZr0aHV8Z2dRa1NmYnJ0aXN0aGViZXN0a2V5", 3600)?;
+                let token = generate_jwt(
+                    &db_pool,
+                    &user,
+                    "uZr0aHV8Z2dRa1NmYnJ0aXN0aGViZXN0a2V5",
+                    3600,
+                )
+                .await?;
                 log::info!("login_by_pwd token: {:?}", token);
                 // 2. 构造 Cookie
                 let cookie = Cookie::build("access_token", token)
@@ -108,6 +144,7 @@ impl AuthService {
             }
         }
     }
+
     pub async fn login_by_email(
         _db_pool: web::Data<DatabaseConnection>,
         email: EmailLogin,

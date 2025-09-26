@@ -6,6 +6,7 @@ use server::{
     config::{init_logger, write_to_file},
     config_routes, create_db_pool,
     middleware::auth::Auth,
+    utils::perm_cache::load_perm_cache,
 };
 #[actix_web::main]
 async fn main() -> Result<()> {
@@ -15,6 +16,7 @@ async fn main() -> Result<()> {
         .context("Failed to connect to database")?;
     // 将db添加到应用数据中
     let db_pool = web::Data::new(db);
+    load_perm_cache(&db_pool.clone()).await.unwrap();
     // 添加sse
     let notifier = web::Data::new(SseNotifier::new());
     write_to_file(); // api_doc生成文件

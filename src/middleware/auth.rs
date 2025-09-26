@@ -1,8 +1,8 @@
+use crate::utils::perm_cache::ROLE_PERMS;
 use actix_web::{
     Error,
     dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
 };
-
 use sea_orm::DatabaseConnection;
 use std::{
     future::{Future, Ready, ready},
@@ -81,6 +81,10 @@ where
                             // 令牌有效，调用服务
                             let fut = self.service.call(req);
                             Box::pin(async move {
+                                let role_perms = ROLE_PERMS.read().await;
+                                if let Some(perms) = role_perms.get(&claims.role_id) {
+                                    log::info!("perms: {:?}", perms);
+                                }
                                 let res = fut.await?;
                                 Ok(res)
                             })
