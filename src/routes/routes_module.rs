@@ -3,9 +3,11 @@ use actix_web::web;
 use crate::{
     auth::login,
     echo,
-    handlers::{create_category, delete_category, get_categories, get_category_by_id, register},
+    handlers::{
+        create_category, delete_category, get_categories, get_category_by_id, register,
+        users::{delete_user_uuid, get_user_uuid, get_users},
+    },
     sse_stream,
-    users::{delete_user_uuid, get_user_uuid, get_users},
 };
 pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(

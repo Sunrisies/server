@@ -1,6 +1,6 @@
 use crate::handlers::auth;
 use crate::handlers::category;
-use crate::services::users;
+use crate::handlers::users;
 use std::fs::File;
 use std::io::Write;
 use utoipa::OpenApi;
