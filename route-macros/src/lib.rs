@@ -89,7 +89,6 @@ pub fn route_permission(attr: TokenStream, item: TokenStream) -> TokenStream {
     output.into()
 }
 #[derive(Debug, PartialEq)]
-
 enum IdType {
     Uuid,
     Integer,
@@ -97,13 +96,12 @@ enum IdType {
 }
 // CRUD 操作枚举
 #[derive(Debug, PartialEq)]
-
 enum CrudOperation {
     // Create,
     Read,
     // Update,
     // Delete,
-    // List,
+    List,
 }
 // 新的参数结构，支持命名参数
 #[derive(Debug, PartialEq)]
@@ -164,7 +162,7 @@ impl Parse for CrudEntityConfig {
                                     "read" => ops.push(CrudOperation::Read),
                                     // "update" => ops.push(CrudOperation::Update),
                                     // "delete" => ops.push(CrudOperation::Delete),
-                                    // "list" => ops.push(CrudOperation::List),
+                                    "list" => ops.push(CrudOperation::List),
                                     _ => {
                                         return Err(syn::Error::new_spanned(
                                             lit_str,
@@ -177,7 +175,9 @@ impl Parse for CrudEntityConfig {
                     }
                     operations = Some(ops);
                 }
-                _ => return Err(syn::Error::new_spanned(key, "Unknown field")),
+                _ => {
+                    return Err(syn::Error::new_spanned(key, "Unknown field"));
+                }
             }
 
             // 检查是否有逗号分隔符
@@ -214,7 +214,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             CrudOperation::Read,
             // CrudOperation::Update,
             // CrudOperation::Delete,
-            // CrudOperation::List,
+            CrudOperation::List,
         ]
     });
 
@@ -242,7 +242,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     let mut read_code = quote! {};
     // let mut update_code = quote! {};
     // let mut delete_code = quote! {};
-    // let mut list_code = quote! {};
+    let mut list_code = quote! {};
 
     // 为每个操作生成代码
     for operation in operations {
@@ -254,33 +254,33 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             CrudOperation::Read => {
                 read_code = generate_read_code(
                     entity,
-                    // route_prefix,
-                    // permission_prefix,
+                    route_prefix,
+                    permission_prefix,
                     &id_rust_type,
                     &find_method,
                     &path_param_type,
                 );
             } // CrudOperation::Update => {
-              //     // update_code = generate_update_code(
-              //     //     entity,
-              //     //     route_prefix,
-              //     //     permission_prefix,
-              //     //     &id_rust_type,
-              //     //     &path_param_type,
-              //     // );
-              // }
-              // CrudOperation::Delete => {
-              //     // delete_code = generate_delete_code(
-              //     //     entity,
-              //     //     route_prefix,
-              //     //     permission_prefix,
-              //     //     &id_rust_type,
-              //     //     &path_param_type,
-              //     // );
-              // }
-              // CrudOperation::List => {
-              //     // list_code = generate_list_code(entity, route_prefix, permission_prefix);
-              // }
+            //     // update_code = generate_update_code(
+            //     //     entity,
+            //     //     route_prefix,
+            //     //     permission_prefix,
+            //     //     &id_rust_type,
+            //     //     &path_param_type,
+            //     // );
+            // }
+            // CrudOperation::Delete => {
+            //     // delete_code = generate_delete_code(
+            //     //     entity,
+            //     //     route_prefix,
+            //     //     permission_prefix,
+            //     //     &id_rust_type,
+            //     //     &path_param_type,
+            //     // );
+            // }
+            CrudOperation::List => {
+                list_code = generate_list_code(entity, route_prefix, permission_prefix);
+            }
         }
     }
     // println!("read_code:{:#?}", read_code);
@@ -293,7 +293,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
         #read_code
         // #update_code
         // #delete_code
-        // #list_code
+        #list_code
         }
     };
 
@@ -302,14 +302,16 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
 
 fn generate_read_code(
     entity: &Ident,
-    // route_prefix: &LitStr,
-    // permission_prefix: &LitStr,
+    route_prefix: &LitStr,
+    permission_prefix: &LitStr,
     id_rust_type: &proc_macro2::TokenStream,
     find_method: &proc_macro2::TokenStream,
     path_param_type: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
     let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
+    let full_path = format!("{}/{{id}}", route_prefix.value());
+    let full_permission = format!("get::{}:read", permission_prefix.value());
     println!("get_fn:{},get_handler:{}", get_fn, get_handler);
     let output = quote! {
         /// 获取实体
@@ -324,11 +326,11 @@ fn generate_read_code(
                 .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))
         }
 
-        // #[::route_macros::route_permission(
-        //     path = #full_path,
-        //     method = "get",
-        //     permission = #full_permission
-        // )]
+        #[crate::route_permission(
+            path = #full_path,
+            method = "get",
+            permission = #full_permission
+        )]
         pub async fn #get_handler(
             db: web::Data<DatabaseConnection>,
             path: web::Path<#path_param_type>,
@@ -399,20 +401,48 @@ fn generate_read_code(
 //     output.into()
 // }
 
-// fn generate_list_code(
-//     entity: &Ident,
-//     route_prefix: &LitStr,
-//     permission_prefix: &LitStr,
-// ) -> TokenStream {
-//     let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
-//     let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
-//     let full_path = format!("{}/{{id}}", route_prefix.value());
-//     let full_permission = format!("{}:read", permission_prefix.value());
+fn generate_list_code(
+    entity: &Ident,
+    route_prefix: &LitStr,
+    permission_prefix: &LitStr,
+) -> proc_macro2::TokenStream {
+    let get_fn = format_ident!("get_{}_all", entity.to_string().to_lowercase());
+    let get_handler = format_ident!("get_{}_all_handler", entity.to_string().to_lowercase());
+    let full_path = format!("{}", route_prefix.value());
+    let full_permission = format!("get::{}:read::list", permission_prefix.value());
+    println!("get_fn:{},get_handler:{}", get_fn, get_handler);
+    let output = quote! {
+        pub async fn #get_fn(
+            db_pool: &DatabaseConnection,
+            page: u64,
+            limit: u64,
+        ) -> Result<HttpResponse,AppError> {
+            match #entity::Entity::find()
+                    .limit(limit)
+                    .offset((page - 1) * limit)
+                    .all(db_pool)
+                    .await {
+                    Ok(data) => Ok(HttpResponse::Ok().json(data)),
+                    Err(e) => {
+                        println!("Database query error: {}", e);
+                        Err(AppError::DatabaseConnectionError(e.to_string()))
+                    }
+            }
+        }
+        #[crate::route_permission(
+            path = #full_path,
+            method = "get",
+            permission = #full_permission
+        )]
+        pub async fn #get_handler(
+            db: web::Data<DatabaseConnection>,
+            query: web::Query<PaginationQuery>,
+        ) -> HttpResult {
+            let PaginationQuery { page, limit } = query.into_inner();
+            let result =  #get_fn(db.as_ref(), page, limit).await?;
+            Ok(result)
+        }
+    };
 
-//     let output = quote! {
-//         /// 获取实体
-
-//     };
-
-//     output.into()
-// }
+    output
+}

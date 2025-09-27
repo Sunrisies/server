@@ -1,16 +1,16 @@
+use crate::config::AppError;
+use crate::dto::PaginationQuery;
+use crate::models::users;
+use crate::{HttpResult, RouteInfo};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
-use sea_orm::DatabaseConnection;
-
-use crate::HttpResult;
-use crate::config::AppError;
-use crate::models::users;
+use sea_orm::{DatabaseConnection, EntityTrait, QuerySelect};
 crud_entity!({
-   entity  : users,
+    entity : users,
     route_prefix:"/api/users",
-    permission_prefix: "users1",
+    permission_prefix: "users",
     id_type:"uuid",
-    operations: ["read"]
+    operations: ["read","list"]
 });
 
 // / 获取用户列表
