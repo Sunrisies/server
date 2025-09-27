@@ -1,6 +1,6 @@
 use crate::handlers::auth;
 use crate::handlers::category;
-use crate::handlers::users;
+// use crate::handlers::users;
 use std::fs::File;
 use std::io::Write;
 use utoipa::OpenApi;
@@ -22,9 +22,9 @@ use utoipa::OpenApi;
         // 权限模块的
         auth::register, // 注册
         auth::login, // 登录
-        users::get_users, // 获取用户列表
-        users::get_user_uuid, // 获取单个用户
-        users::delete_user_uuid, // 删除用户
+        // users::get_users, // 获取用户列表
+        // users::get_user_uuid, // 获取单个用户
+        // users::delete_user_uuid, // 删除用户
         category::create_category, // 创建分类
         category::get_categories, // 获取分类列表
         // category::get_category_uuid, // 获取单个分类

@@ -10,7 +10,7 @@ pub mod middleware;
 pub use middleware::helpers::*;
 pub mod utils;
 pub use utils::sse::*;
-mod handlers;
+pub mod handlers;
 pub mod services;
 pub use handlers::auth;
 pub use services::*;
@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 // 重新导出宏
 pub use route_macros::route_permission;
+
 // 定义路由信息结构体（必须与宏crate中的完全一致）
 #[derive(Debug, Clone)]
 pub struct RouteInfo {

@@ -5,7 +5,7 @@ use crate::{
     echo,
     handlers::{
         create_category, delete_category, get_categories, get_category_by_id, register,
-        users::{delete_user_uuid, get_user_uuid, get_users},
+        users::users_routes::get_users_handler,
     },
     sse_stream,
 };
@@ -18,11 +18,9 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                     .route("/login", web::post().to(login)),
             )
             .service(
-                web::scope("/v1/users")
-                    .route("", web::get().to(get_users))
-                    .route("/{uuid:.*}", web::get().to(get_user_uuid))
-                    // .route("/{uuid:.*}", web::put().to(put_demo))
-                    .route("/{uuid:.*}", web::delete().to(delete_user_uuid)),
+                web::scope("/v1/users") // .route("", web::get().to(get_api_users_handler))
+                    .route("/{uuid:.*}", web::get().to(get_users_handler)), // .route("/{uuid:.*}", web::put().to(put_demo))
+                                                                            // .route("/{uuid:.*}", web::delete().to(delete_user_uuid)),
             )
             .service(web::scope("/v1/ws").route("", web::get().to(echo)))
             .service(web::scope("/v1/sse").route("/stream", web::get().to(sse_stream)))
