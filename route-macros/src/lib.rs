@@ -97,7 +97,7 @@ enum IdType {
 // CRUD 操作枚举
 #[derive(Debug, PartialEq)]
 enum CrudOperation {
-    // Create,
+    Create,
     Read,
     // Update,
     // Delete,
@@ -111,6 +111,7 @@ struct CrudEntityConfig {
     permission_prefix: LitStr,
     id_type: Option<IdType>,
     operations: Option<Vec<CrudOperation>>,
+    create_request_type: Option<Ident>, // 新增请求类型
 }
 
 impl Parse for CrudEntityConfig {
@@ -123,6 +124,7 @@ impl Parse for CrudEntityConfig {
         let mut permission_prefix = None;
         let mut id_type = None;
         let mut operations = None;
+        let mut create_request_type = None;
 
         // 解析键值对
         while !content.is_empty() {
@@ -158,7 +160,7 @@ impl Parse for CrudEntityConfig {
                         if let Expr::Lit(lit) = elem {
                             if let syn::Lit::Str(lit_str) = lit.lit {
                                 match lit_str.value().as_str() {
-                                    // "create" => ops.push(CrudOperation::Create),
+                                    "create" => ops.push(CrudOperation::Create),
                                     "read" => ops.push(CrudOperation::Read),
                                     // "update" => ops.push(CrudOperation::Update),
                                     // "delete" => ops.push(CrudOperation::Delete),
@@ -174,6 +176,10 @@ impl Parse for CrudEntityConfig {
                         }
                     }
                     operations = Some(ops);
+                }
+                "create_request_type" => {
+                    let value: Ident = content.parse()?;
+                    create_request_type = Some(value);
                 }
                 _ => {
                     return Err(syn::Error::new_spanned(key, "Unknown field"));
@@ -194,6 +200,7 @@ impl Parse for CrudEntityConfig {
                 .ok_or_else(|| content.error("Missing required field 'permission_prefix'"))?,
             id_type,
             operations,
+            create_request_type, // 新增请求类型
         })
     }
 }
@@ -210,7 +217,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
 
     let operations = config.operations.unwrap_or_else(|| {
         vec![
-            // CrudOperation::Create,
+            CrudOperation::Create,
             CrudOperation::Read,
             // CrudOperation::Update,
             // CrudOperation::Delete,
@@ -238,7 +245,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
 
     let mod_name = format_ident!("{}_routes", entity.to_string().to_lowercase());
     // let mut generated_code = quote! {};
-    // let mut create_code = quote! {};
+    let mut create_code = quote! {};
     let mut read_code = quote! {};
     // let mut update_code = quote! {};
     // let mut delete_code = quote! {};
@@ -247,10 +254,14 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     // 为每个操作生成代码
     for operation in operations {
         match operation {
-            // CrudOperation::Create => {
-            //     // create_code =
-            //     //     generate_create_code(entity, route_prefix, permission_prefix, &id_rust_type);
-            // }
+            CrudOperation::Create => {
+                create_code = generate_create_code(
+                    entity,
+                    route_prefix,
+                    permission_prefix,
+                    &config.create_request_type,
+                );
+            }
             CrudOperation::Read => {
                 read_code = generate_read_code(
                     entity,
@@ -289,7 +300,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     let output = quote! {
         pub mod #mod_name {
             use super::*;
-            //   #create_code
+              #create_code
         #read_code
         // #update_code
         // #delete_code
@@ -346,26 +357,76 @@ fn generate_read_code(
     output
 }
 
-// fn generate_create_code(
-//     entity: &Ident,
-//     route_prefix: &LitStr,
-//     permission_prefix: &LitStr,
-//     id_rust_type: &TokenStream,
-//     // find_method: &TokenStream,
-//     // path_param_type: &TokenStream,
-// ) -> TokenStream {
-//     let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
-//     let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
-//     let full_path = format!("{}/{{id}}", route_prefix.value());
-//     let full_permission = format!("{}:read", permission_prefix.value());
+fn generate_create_code(
+    entity: &Ident,
+    route_prefix: &LitStr,
+    permission_prefix: &LitStr,
+    create_request_type: &Option<proc_macro2::Ident>,
+) -> proc_macro2::TokenStream {
+    let create_fn = format_ident!("create_{}", entity.to_string().to_lowercase());
+    let create_handler = format_ident!("create_{}_handler", entity.to_string().to_lowercase());
+    let full_path = format!("{}", route_prefix.value());
+    println!("create_fn:{},create_handler:{}", create_fn, create_handler);
+    // 生成权限字符串
+    let full_permission = format!("{}:create", permission_prefix.value());
+    let create_request_type = match create_request_type {
+        Some(ident) => ident,
+        None => {
+            return syn::Error::new_spanned(
+                entity,
+                "create_request_type is required for Create operation",
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
+    let output = quote! {
+       pub async fn #create_fn(
+            db: &DatabaseConnection,
+            data: #create_request_type,
+        ) ->Result<#entity::Model, AppError> {
+            let active_model = #entity::ActiveModel::from(data);
 
-//     let output = quote! {
-//         /// 获取实体
+            let model = active_model.insert(db).await.map_err(|e| {
+                println!("添加分类失败: {}", e);
+                AppError::DatabaseConnectionError(db_err_map(e).to_owned())
+            })?;
 
-//     };
+            Ok(model)
+        }
 
-//     output.into()
-// }
+        #[crate::route_permission(
+            path = #full_path,
+            method = "post",
+            permission = #full_permission
+        )]
+        pub async fn #create_handler(
+            db: web::Data<DatabaseConnection>,
+            data: web::Json<#create_request_type>,
+        ) -> HttpResult {
+
+            log::info!("Creating new {}", stringify!(#entity));
+            // Ok(ApiResponse::success("1111", "添加成功").to_http_response())
+            match #create_fn(db.get_ref(), data.into_inner()).await {
+                Ok(category) => Ok(ApiResponse::success(category, "添加成功").to_http_response()),
+        Err(AppError::DatabaseConnectionError(msg)) => {
+            // 统一包装：HTTP 200，业务码 200，message 提示不存在
+            Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+        }
+        Err(e) => {
+            // 其他错误（数据库等）按原样返回 500/400 等
+            Ok(ApiResponse::from(e).to_http_response())
+        }
+        //           Ok(user) => Ok(ApiResponse::success(user, "添加成功").to_http_response()),
+    }
+
+
+        }
+
+    };
+
+    output
+}
 
 // fn generate_update_code(
 //     entity: &Ident,

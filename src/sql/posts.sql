@@ -17,13 +17,11 @@ COMMENT ON COLUMN categories.slug IS 'URL 用英文标识';
 CREATE TABLE tags (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(50) NOT NULL,
-    color       CHAR(7)     DEFAULT '#007bff',  -- 前端展示颜色
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (name)
 );
 COMMENT ON TABLE tags IS '文章标签';
 COMMENT ON COLUMN tags.name  IS '标签名称';
-COMMENT ON COLUMN tags.color IS '标签颜色';
 
 -- 3️⃣ 文章表
 CREATE TABLE posts (

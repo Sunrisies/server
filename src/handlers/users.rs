@@ -1,18 +1,38 @@
 use crate::config::AppError;
 use crate::dto::PaginationQuery;
+use crate::dto::category::CreateCategoryRequest;
+use crate::dto::tag::CreateTagRequest;
 use crate::models::users;
-use crate::{HttpResult, RouteInfo};
+use crate::models::{categories, tags};
+use crate::{ApiResponse, HttpResult, RouteInfo, utils::db_err_map};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
-use sea_orm::{DatabaseConnection, EntityTrait, QuerySelect};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, QuerySelect};
 crud_entity!({
     entity : users,
     route_prefix:"/api/users",
     permission_prefix: "users",
     id_type:"uuid",
-    operations: ["read","list"]
+    operations: ["read","list"],
 });
 
+crud_entity!({
+    entity : categories,
+    route_prefix:"/api/categories",
+    permission_prefix: "categories",
+    id_type:"id",
+    operations: ["create"],
+    create_request_type: CreateCategoryRequest
+
+});
+crud_entity!({
+    entity : tags,
+    route_prefix:"/api/tags",
+    permission_prefix: "tags",
+    id_type:"id",
+    operations: ["create","list"],
+    create_request_type: CreateTagRequest
+});
 // / 获取用户列表
 // #[utoipa::path(
 //     get,
