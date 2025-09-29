@@ -53,7 +53,7 @@ where
             "/api/v1/auth/register",
             "/api/v1/sse",
             "/api/v1/ws",
-            "/api/v1/tags",
+            "/api/v1/tags/",
         ];
         if public_paths.contains(&path.as_str()) {
             // 公开路径，直接调用服务

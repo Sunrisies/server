@@ -91,7 +91,6 @@ pub fn route_permission(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[derive(Debug, PartialEq)]
 enum IdType {
     Uuid,
-    Integer,
     Custom(String),
 }
 // CRUD 操作枚举
@@ -100,7 +99,7 @@ enum CrudOperation {
     Create,
     Read,
     // Update,
-    // Delete,
+    Delete,
     List,
 }
 // 新的参数结构，支持命名参数
@@ -148,7 +147,6 @@ impl Parse for CrudEntityConfig {
                     let value: LitStr = content.parse()?;
                     id_type = Some(match value.value().as_str() {
                         "uuid" => IdType::Uuid,
-                        "integer" => IdType::Integer,
                         custom => IdType::Custom(custom.to_string()),
                     });
                 }
@@ -163,7 +161,7 @@ impl Parse for CrudEntityConfig {
                                     "create" => ops.push(CrudOperation::Create),
                                     "read" => ops.push(CrudOperation::Read),
                                     // "update" => ops.push(CrudOperation::Update),
-                                    // "delete" => ops.push(CrudOperation::Delete),
+                                    "delete" => ops.push(CrudOperation::Delete),
                                     "list" => ops.push(CrudOperation::List),
                                     _ => {
                                         return Err(syn::Error::new_spanned(
@@ -213,14 +211,14 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     let route_prefix = &config.route_prefix;
     let permission_prefix = &config.permission_prefix;
     // 根据ID类型生成不同的代码
-    let id_type = config.id_type.unwrap_or(IdType::Integer);
+    let id_type = config.id_type.unwrap_or(IdType::Uuid);
 
     let operations = config.operations.unwrap_or_else(|| {
         vec![
             CrudOperation::Create,
             CrudOperation::Read,
             // CrudOperation::Update,
-            // CrudOperation::Delete,
+            CrudOperation::Delete,
             CrudOperation::List,
         ]
     });
@@ -232,23 +230,18 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             quote! { find_by_uuid },
             quote! { String },
         ),
-        IdType::Integer => (quote! { i32 }, quote! { find_by_id }, quote! { i32 }),
-        IdType::Custom(custom_type) => {
-            let custom_ident = format_ident!("{}", custom_type);
-            (
-                quote! { #custom_ident },
-                quote! { find_by_id },
-                quote! { #custom_ident },
-            )
-        }
+        IdType::Custom(_custom_type) => (quote! { i32 }, quote! { find_by_id }, quote! { i32 }),
     };
-
+    println!(
+        "id_rust_type:{}, find_method:{}, path_param_type:{}",
+        id_rust_type, find_method, path_param_type
+    );
     let mod_name = format_ident!("{}_routes", entity.to_string().to_lowercase());
     // let mut generated_code = quote! {};
     let mut create_code = quote! {};
     let mut read_code = quote! {};
     // let mut update_code = quote! {};
-    // let mut delete_code = quote! {};
+    let mut delete_code = quote! {};
     let mut list_code = quote! {};
 
     // 为每个操作生成代码
@@ -280,30 +273,27 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             //     //     &path_param_type,
             //     // );
             // }
-            // CrudOperation::Delete => {
-            //     // delete_code = generate_delete_code(
-            //     //     entity,
-            //     //     route_prefix,
-            //     //     permission_prefix,
-            //     //     &id_rust_type,
-            //     //     &path_param_type,
-            //     // );
-            // }
+            CrudOperation::Delete => {
+                delete_code = generate_delete_code(
+                    entity,
+                    route_prefix,
+                    permission_prefix,
+                    &id_rust_type,
+                    &find_method,
+                );
+            }
             CrudOperation::List => {
                 list_code = generate_list_code(entity, route_prefix, permission_prefix);
             }
         }
     }
-    // println!("read_code:{:#?}", read_code);
-
-    // let fragments_iter = fragments.iter();
     let output = quote! {
         pub mod #mod_name {
             use super::*;
               #create_code
         #read_code
         // #update_code
-        // #delete_code
+        #delete_code
         #list_code
         }
     };
@@ -409,20 +399,16 @@ fn generate_create_code(
             // Ok(ApiResponse::success("1111", "添加成功").to_http_response())
             match #create_fn(db.get_ref(), data.into_inner()).await {
                 Ok(category) => Ok(ApiResponse::success(category, "添加成功").to_http_response()),
-        Err(AppError::DatabaseConnectionError(msg)) => {
-            // 统一包装：HTTP 200，业务码 200，message 提示不存在
-            Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+                Err(AppError::DatabaseConnectionError(msg)) => {
+                    // 统一包装：HTTP 200，业务码 200，message 提示不存在
+                    Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+                }
+                Err(e) => {
+                    // 其他错误（数据库等）按原样返回 500/400 等
+                    Ok(ApiResponse::from(e).to_http_response())
+                }
+            }
         }
-        Err(e) => {
-            // 其他错误（数据库等）按原样返回 500/400 等
-            Ok(ApiResponse::from(e).to_http_response())
-        }
-        //           Ok(user) => Ok(ApiResponse::success(user, "添加成功").to_http_response()),
-    }
-
-
-        }
-
     };
 
     output
@@ -445,22 +431,59 @@ fn generate_create_code(
 //     output.into()
 // }
 
-// fn generate_delete_code(
-//     entity: &Ident,
-//     route_prefix: &LitStr,
-//     permission_prefix: &LitStr,
-//     id_rust_type: &TokenStream,
-//     find_method: &TokenStream,
-// ) -> TokenStream {
-//     let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
-//     let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
-//     let full_path = format!("{}/{{id}}", route_prefix.value());
-//     let full_permission = format!("{}:read", permission_prefix.value());
+fn generate_delete_code(
+    entity: &Ident,
+    route_prefix: &LitStr,
+    permission_prefix: &LitStr,
+    id_rust_type: &proc_macro2::TokenStream,
+    find_method: &proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    let delete_fn = format_ident!("delete_{}", entity.to_string().to_lowercase());
+    let delete_handler = format_ident!("delete_{}_handler", entity.to_string().to_lowercase());
+    let full_path = format!("{}/{{id}}", route_prefix.value());
+    let full_permission = format!("{}:delete:id", permission_prefix.value());
+    println!(
+        "delete_fn:{},delete_handler:{},id_rust_type:{}",
+        delete_fn, delete_handler, id_rust_type
+    );
+    let output = quote! {
+        pub async fn #delete_fn(
+            db: &DatabaseConnection,
+            id: #id_rust_type,
+        ) ->HttpResult {
+            println!("Deleting {} with id: {},find_method:{}", stringify!(#entity), id,stringify!(#find_method));
+            let entity = #entity::Entity::#find_method(id).one(db)
+                .await
+                .map_err(|e| AppError::DatabaseError(e.to_string()))?
+                .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))?;
+            match entity.delete(db).await {
+                Ok(_res) => Ok(ApiResponse::<()>::success_msg("删除成功").to_http_response()),
+                Err(e) => {
+                    println!("删除失败: {}", e);
+                    Ok(
+                        ApiResponse::from(AppError::DatabaseConnectionError(db_err_map(e).to_owned()))
+                            .to_http_response(),
+                    )
+                }
+            }
+        }
 
-//     let output = quote! {};
+        #[crate::route_permission(
+            path = #full_path,
+            method = "delete",
+            permission = #full_permission
+        )]
+        pub async fn #delete_handler(
+            db: web::Data<DatabaseConnection>,
+            id: web::Path<#id_rust_type>,
+        ) -> HttpResult {
+            let result = #delete_fn(db.get_ref(), id.into_inner()).await?;
+            Ok(result)
+        }
+    };
 
-//     output.into()
-// }
+    output
+}
 
 fn generate_list_code(
     entity: &Ident,
