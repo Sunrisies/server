@@ -13,7 +13,6 @@ async fn main() -> Result<()> {
     init_logger(); // 初始化日志
     // 初始化路由注册表 - 这行很重要！
     init_route_registry();
-
     // 打印所有注册的路由（调试用）
     let routes = get_all_routes();
     log::info!("Registered {} routes:", routes.len());

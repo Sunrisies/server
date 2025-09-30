@@ -1,4 +1,5 @@
 mod routes;
+use route_macros::flush_crud_logs;
 pub use routes::config_routes;
 pub mod models;
 pub use models::prelude;
@@ -46,11 +47,6 @@ pub fn init_route_registry() {
     for route_info in inventory::iter::<RouteInfo> {
         let key = format!("{}:{}", route_info.method.to_uppercase(), route_info.path);
         registry.insert(key, route_info.clone());
-
-        println!(
-            "Registered route: {} {} -> {}",
-            route_info.method, route_info.path, route_info.permission
-        );
     }
 }
 
@@ -66,3 +62,4 @@ pub fn get_all_routes() -> Vec<RouteInfo> {
     let registry = ROUTE_REGISTRY.read().unwrap();
     registry.values().cloned().collect()
 }
+flush_crud_logs!();
