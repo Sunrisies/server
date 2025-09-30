@@ -223,19 +223,20 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
         ]
     });
 
-    // 根据 ID 类型确定相关类型
-    let (id_rust_type, find_method, path_param_type) = match id_type {
+    let (fn_arg, call_expr, path_param_type) = match id_type {
+        // i32 / i64  直接传值
         IdType::Uuid => (
-            quote! { String },
-            quote! { find_by_uuid },
+            quote! { id: String },
+            quote! { #entity::Entity::find_by_uuid(&id) },
             quote! { String },
         ),
-        IdType::Custom(_custom_type) => (quote! { i32 }, quote! { find_by_id }, quote! { i32 }),
+        IdType::Custom(_) => (
+            quote! { id: i32 },
+            quote! { #entity::Entity::find_by_id(id) },
+            quote! { i32 },
+        ),
     };
-    println!(
-        "id_rust_type:{}, find_method:{}, path_param_type:{}",
-        id_rust_type, find_method, path_param_type
-    );
+
     let mod_name = format_ident!("{}_routes", entity.to_string().to_lowercase());
     // let mut generated_code = quote! {};
     let mut create_code = quote! {};
@@ -260,9 +261,9 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     entity,
                     route_prefix,
                     permission_prefix,
-                    &id_rust_type,
-                    &find_method,
                     &path_param_type,
+                    &fn_arg,
+                    &call_expr,
                 );
             } // CrudOperation::Update => {
             //     // update_code = generate_update_code(
@@ -278,8 +279,9 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     entity,
                     route_prefix,
                     permission_prefix,
-                    &id_rust_type,
-                    &find_method,
+                    &path_param_type,
+                    &fn_arg,
+                    &call_expr,
                 );
             }
             CrudOperation::List => {
@@ -305,9 +307,9 @@ fn generate_read_code(
     entity: &Ident,
     route_prefix: &LitStr,
     permission_prefix: &LitStr,
-    id_rust_type: &proc_macro2::TokenStream,
-    find_method: &proc_macro2::TokenStream,
     path_param_type: &proc_macro2::TokenStream,
+    fn_arg: &proc_macro2::TokenStream,
+    call_expr: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
     let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
@@ -318,9 +320,9 @@ fn generate_read_code(
         /// 获取实体
         pub async fn #get_fn(
             db: &DatabaseConnection,
-            id: #id_rust_type,
+             #fn_arg,
         ) -> Result<#entity::Model, AppError> {
-            #entity::Entity::#find_method(&id)
+            #call_expr
                 .one(db)
                 .await
                 .map_err(|e| AppError::DatabaseError(e.to_string()))?
@@ -338,8 +340,12 @@ fn generate_read_code(
         ) -> HttpResult {
             let id = path.into_inner();
             match #get_fn(db.get_ref(), id).await {
-                Ok(result) => Ok(HttpResponse::Ok().json(result)),
-                Err(e) => Err(e.into()),
+                Ok(data) => Ok(HttpResponse::Ok().json(data)),
+                Err(AppError::NotFound(msg)) => {
+                    Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+                },
+                _ => todo!()
+
             }
         }
     };
@@ -435,24 +441,24 @@ fn generate_delete_code(
     entity: &Ident,
     route_prefix: &LitStr,
     permission_prefix: &LitStr,
-    id_rust_type: &proc_macro2::TokenStream,
-    find_method: &proc_macro2::TokenStream,
+    path_param_type: &proc_macro2::TokenStream,
+    fn_arg: &proc_macro2::TokenStream,
+    call_expr: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     let delete_fn = format_ident!("delete_{}", entity.to_string().to_lowercase());
     let delete_handler = format_ident!("delete_{}_handler", entity.to_string().to_lowercase());
     let full_path = format!("{}/{{id}}", route_prefix.value());
     let full_permission = format!("{}:delete:id", permission_prefix.value());
     println!(
-        "delete_fn:{},delete_handler:{},id_rust_type:{}",
-        delete_fn, delete_handler, id_rust_type
+        "delete_fn:{},delete_handler:{},path_param_type:{}",
+        delete_fn, delete_handler, path_param_type
     );
     let output = quote! {
         pub async fn #delete_fn(
             db: &DatabaseConnection,
-            id: #id_rust_type,
+            #fn_arg,
         ) ->HttpResult {
-            println!("Deleting {} with id: {},find_method:{}", stringify!(#entity), id,stringify!(#find_method));
-            let entity = #entity::Entity::#find_method(id).one(db)
+            let entity = #call_expr.one(db)
                 .await
                 .map_err(|e| AppError::DatabaseError(e.to_string()))?
                 .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))?;
@@ -475,7 +481,7 @@ fn generate_delete_code(
         )]
         pub async fn #delete_handler(
             db: web::Data<DatabaseConnection>,
-            id: web::Path<#id_rust_type>,
+            id: web::Path<#path_param_type>,
         ) -> HttpResult {
             let result = #delete_fn(db.get_ref(), id.into_inner()).await?;
             Ok(result)

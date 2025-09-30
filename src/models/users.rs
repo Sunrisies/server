@@ -44,6 +44,15 @@ impl Related<super::posts::Entity> for Entity {
 }
 
 impl Entity {
+    /// 按任意唯一列查询（编译期已知列 & 值类型）
+    pub fn find_by_col<C, V>(col: C, val: V) -> Select<Self>
+    where
+        C: ColumnTrait,
+        V: Into<sea_orm::Value>,
+    {
+        Self::find().filter(col.eq(val))
+    }
+
     // 添加按UUID查询的方法
     pub fn find_by_uuid(uuid: &str) -> Select<Entity> {
         Self::find().filter(Column::Uuid.eq(uuid))

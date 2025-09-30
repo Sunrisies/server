@@ -1,0 +1,17 @@
+use crate::config::AppError;
+use crate::dto::PaginationQuery;
+use crate::dto::tag::CreateTagRequest;
+use crate::models::tags;
+use crate::{ApiResponse, HttpResult, RouteInfo, utils::db_err_map};
+use actix_web::{HttpResponse, web};
+use route_macros::crud_entity;
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, ModelTrait, QuerySelect};
+
+crud_entity!({
+    entity : tags,
+    route_prefix:"/api/tags",
+    permission_prefix: "tags",
+    id_type:"id",
+    operations: ["create","list","delete"],
+    create_request_type: CreateTagRequest
+});
