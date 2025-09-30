@@ -1,9 +1,9 @@
+use super::openapi::OpenApiGenerator;
+use crate::args::{CrudEntityConfig, CrudOperation, IdType};
+use crate::log::{LOGGER, LogLevel};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Ident, LitStr, parse_macro_input};
-
-use crate::args::{CrudEntityConfig, CrudOperation, IdType};
-use crate::log::{LOGGER, LogLevel};
 
 /// 简化版 CRUD 宏 - 为实体快速生成标准 CRUD 操作
 pub fn crud_entity(input: TokenStream) -> TokenStream {
@@ -23,20 +23,25 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
         ]
     });
 
-    let (fn_arg, call_expr, path_param_type) = match id_type {
+    let (fn_arg, call_expr, path_param_type, id_type_str) = match id_type {
         IdType::Uuid => (
             quote! { id: String },
             quote! { #entity::Entity::find_by_uuid(&id) },
             quote! { String },
+            "uuid",
         ),
         IdType::Custom(_) => (
             quote! { id: i32 },
             quote! { #entity::Entity::find_by_id(id) },
             quote! { i32 },
+            "id",
         ),
     };
 
     let mod_name = format_ident!("{}_routes", entity.to_string().to_lowercase());
+
+    // 创建 OpenAPI 生成器
+    let openapi_gen = OpenApiGenerator::new(entity, route_prefix);
 
     let mut create_code = quote! {};
     let mut read_code = quote! {};
@@ -57,7 +62,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     &config.create_request_type,
                 );
                 operation_logs.push(format!(
-                    "创建操作: create_{}",
+                    "创建操作: create_{}_handler",
                     entity.to_string().to_lowercase()
                 ));
             }
@@ -69,9 +74,11 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     &path_param_type,
                     &fn_arg,
                     &call_expr,
+                    &openapi_gen,
+                    id_type_str,
                 );
                 operation_logs.push(format!(
-                    "读取操作: get_{}",
+                    "读取操作: get_{}_handler",
                     entity.to_string().to_lowercase()
                 ));
             }
@@ -85,14 +92,14 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     &call_expr,
                 );
                 operation_logs.push(format!(
-                    "删除操作: delete_{}",
+                    "删除操作: delete_{}_handler",
                     entity.to_string().to_lowercase()
                 ));
             }
             CrudOperation::List => {
                 list_code = generate_list_code(entity, route_prefix, permission_prefix);
                 operation_logs.push(format!(
-                    "列表操作: get_{}_all",
+                    "列表操作: get_{}_all_handler",
                     entity.to_string().to_lowercase()
                 ));
             }
@@ -150,13 +157,17 @@ fn generate_read_code(
     path_param_type: &proc_macro2::TokenStream,
     fn_arg: &proc_macro2::TokenStream,
     call_expr: &proc_macro2::TokenStream,
+    openapi_gen: &OpenApiGenerator,
+    id_type_str: &str,
 ) -> proc_macro2::TokenStream {
     let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
     let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
     let full_path = format!("{}/{{id}}", route_prefix.value());
     let full_permission = format!("get::{}:read", permission_prefix.value());
+    let openapi_doc = openapi_gen.generate_read_doc(id_type_str);
 
     quote! {
+
         /// 获取实体
         pub async fn #get_fn(
             db: &DatabaseConnection,
@@ -169,6 +180,7 @@ fn generate_read_code(
                 .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))
         }
 
+        #openapi_doc
         #[crate::route_permission(
             path = #full_path,
             method = "get",

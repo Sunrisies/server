@@ -4,3 +4,4 @@ pub mod auth;
 pub use auth::register;
 pub mod tags;
 pub mod users;
+pub use users::users_routes::*;

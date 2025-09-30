@@ -70,3 +70,6 @@ incremental = false
 opt-level = 0
 debug = true
 debug-assertions = true
+
+[package.metadata]
+rustc-args = ["-Z", "unpretty=expanded"]

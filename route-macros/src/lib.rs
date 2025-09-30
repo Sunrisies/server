@@ -1,6 +1,7 @@
 mod args;
 mod crud;
 mod log;
+mod openapi;
 mod route_permission;
 
 #[proc_macro_attribute]
