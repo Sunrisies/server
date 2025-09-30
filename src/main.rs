@@ -8,11 +8,13 @@ use server::{
     middleware::auth::Auth,
     utils::perm_cache::load_perm_cache,
 };
+
 #[actix_web::main]
 async fn main() -> Result<()> {
     init_logger(); // 初始化日志
     // 初始化路由注册表 - 这行很重要！
     init_route_registry();
+
     // 打印所有注册的路由（调试用）
     let routes = get_all_routes();
     log::info!("Registered {} routes:", routes.len());
@@ -29,7 +31,7 @@ async fn main() -> Result<()> {
     let notifier = web::Data::new(SseNotifier::new());
     write_to_file(); // api_doc生成文件
     println!("Server running on http://127.0.0.1:2345");
-    let _ = HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://127.0.0.1:5502")
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
@@ -43,14 +45,16 @@ async fn main() -> Result<()> {
             .wrap(actix_web::middleware::Logger::default())
             .wrap(cors)
             .wrap(Auth)
-    })
-    .bind(("0.0.0.0", 2345))?
-    .on_connect(move |conn, _addr| {
-        println!("New connection: {:?}", conn);
-        println!("Remote address: {:?}", _addr);
-    })
-    .run()
-    .await;
+    });
+
+    server
+        .bind(("0.0.0.0", 2345))?
+        .on_connect(move |conn, _addr| {
+            println!("New connection: {:?}", conn);
+            println!("Remote address: {:?}", _addr);
+        })
+        .run()
+        .await?;
     Ok(())
 }
 

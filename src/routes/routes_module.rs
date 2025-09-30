@@ -5,7 +5,6 @@ use crate::{
     echo,
     handlers::{
         category::categories_routes::{create_categories_handler, get_categories_handler},
-        // delete_category, get_categories, get_category_by_id,
         register,
         tags::tags_routes::{create_tags_handler, delete_tags_handler, get_tags_all_handler},
         users::users_routes::{get_users_all_handler, get_users_handler},

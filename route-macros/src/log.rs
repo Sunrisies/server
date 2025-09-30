@@ -52,6 +52,10 @@ impl MacroLogger {
     }
 
     pub fn flush(&self) {
+        println!(
+            "self.config.enabled{},self.module_logs:{:?}",
+            self.config.enabled, self.module_logs
+        );
         if !self.config.enabled || self.module_logs.is_empty() {
             return;
         }

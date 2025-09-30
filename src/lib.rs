@@ -1,5 +1,4 @@
 mod routes;
-use route_macros::flush_crud_logs;
 pub use routes::config_routes;
 pub mod models;
 pub use models::prelude;
@@ -62,4 +61,6 @@ pub fn get_all_routes() -> Vec<RouteInfo> {
     let registry = ROUTE_REGISTRY.read().unwrap();
     registry.values().cloned().collect()
 }
+use route_macros::flush_crud_logs;
+
 flush_crud_logs!();

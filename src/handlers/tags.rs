@@ -12,6 +12,6 @@ crud_entity!({
     route_prefix:"/api/tags",
     permission_prefix: "tags",
     id_type:"id",
-    operations: ["create","list","delete"],
+    operations: ["create","list","delete","read"],
     create_request_type: CreateTagRequest
 });
