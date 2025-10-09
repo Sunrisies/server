@@ -1,9 +1,9 @@
+use crate::models::categories;
 use sea_orm::ActiveValue::Set;
 use serde::Deserialize;
 use utoipa::ToSchema;
 
-use crate::models::categories;
-// 创建分类的请求体
+/// 创建分类的请求体
 #[derive(Deserialize, ToSchema, Debug)]
 pub struct CreateCategoryRequest {
     #[schema(example = "Tech")]
