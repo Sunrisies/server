@@ -7,7 +7,7 @@ use route_macros::crud_entity;
 use sea_orm::{DatabaseConnection, EntityTrait, QuerySelect};
 crud_entity!({
     entity : users,
-    route_prefix:"/api/users",
+    route_prefix:"/api/v1/users",
     permission_prefix: "users",
     id_type:"uuid",
     operations: ["list","read"],
