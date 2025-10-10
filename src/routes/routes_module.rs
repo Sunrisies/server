@@ -4,7 +4,9 @@ use crate::{
     auth::login,
     echo,
     handlers::{
-        category::categories_routes::{create_categories_handler, get_categories_handler},
+        category::categories_routes::{
+            create_categories_handler, get_categories_all_handler, get_categories_handler,
+        },
         register,
         tags::tags_routes::{create_tags_handler, delete_tags_handler, get_tags_all_handler},
         users::users_routes::{get_users_all_handler, get_users_handler},
@@ -30,8 +32,9 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::scope("/v1/categories")
                     .route("", web::post().to(create_categories_handler))
-                    .route("/{id}", web::get().to(get_categories_handler)), // .route("", web::get().to(get_categories)) // .route("/{id}", web::put().to(handlers::category::update_category))
-                                                                            // .route("/{id}", web::delete().to(delete_category)),
+                    .route("/{id}", web::get().to(get_categories_handler))
+                    .route("", web::get().to(get_categories_all_handler)), // .route("/{id}", web::put().to(handlers::category::update_category))
+                                                                           // .route("/{id}", web::delete().to(delete_category)),
             )
             .service(
                 web::scope("/v1/tags")

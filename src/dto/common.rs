@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
-// 统一分页响应
+/// 统一分页响应
 #[derive(Serialize, ToSchema)]
 pub struct PaginatedResp<T: Serialize> {
     pub data: Vec<T>,

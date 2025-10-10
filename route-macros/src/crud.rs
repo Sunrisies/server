@@ -328,17 +328,53 @@ fn generate_list_code(
             page: u64,
             limit: u64,
         ) -> Result<HttpResponse,AppError> {
-            match #entity::Entity::find()
-                    .limit(limit)
-                    .offset((page - 1) * limit)
-                    .all(db_pool)
-                    .await {
-                    Ok(data) => Ok(HttpResponse::Ok().json(data)),
-                    Err(e) => {
-                        println!("Database query error: {}", e);
-                        Err(AppError::DatabaseConnectionError(e.to_string()))
-                    }
+            // match #entity::Entity::find()
+            //         .limit(limit)
+            //         .offset((page - 1) * limit)
+            //         .all(db_pool)
+            //         .await {
+            //         Ok(data) => Ok(HttpResponse::Ok().json(data)),
+            //         Err(e) => {
+            //             println!("Database query error: {}", e);
+            //             Err(AppError::DatabaseConnectionError(e.to_string()))
+            //         }
+            // }
+        // 1. 建立分页器
+        let paginator = #entity::Entity::find().paginate(db_pool, limit);
+
+        // 2. 并发拿总数 + 当前页数据（Sea-ORM 顺序执行，但代码简洁）
+        let total = match paginator.num_items().await {
+            Ok(t) => t,
+            Err(e) => {
+                println!("查询{}总数失败: {}",stringify!(#full_path),e);
+                return Ok(ApiResponse::from(AppError::DatabaseConnectionError(
+                    "获取失败".to_string(),
+                ))
+                .to_http_response());
             }
+        };
+
+        let data = match paginator.fetch_page(page.saturating_sub(1)).await {
+            Ok(list) => list,
+            Err(e) => {
+                println!("查询{}列表失败: {}",stringify!(#full_path), e);
+                return Ok(ApiResponse::from(AppError::DatabaseConnectionError(
+                    "获取列表失败".to_string(),
+                ))
+                .to_http_response());
+            }
+        };
+        log::info!("data:{:?}", data);
+        // 3. 组装成前端需要的分页结构
+        let resp = PaginatedResp {
+            data,
+            total, // u64 -> usize
+            page,
+            limit,
+        };
+
+        // 4. 统一出口
+            Ok(ApiResponse::success(resp, "获取成功").to_http_response())
         }
         #[crate::route_permission(
             path = #full_path,
@@ -351,6 +387,7 @@ fn generate_list_code(
         ) -> HttpResult {
             let PaginationQuery { page, limit } = query.into_inner();
             let result =  #get_fn(db.as_ref(), page, limit).await?;
+            // 4. 统一出口
             Ok(result)
         }
     }
