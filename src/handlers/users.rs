@@ -1,10 +1,12 @@
 use crate::config::AppError;
+use crate::dto::PaginatedResp;
 use crate::dto::PaginationQuery;
 use crate::models::users;
 use crate::{ApiResponse, HttpResult, RouteInfo};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
-use sea_orm::{DatabaseConnection, EntityTrait, QuerySelect};
+use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait};
+
 crud_entity!({
     entity : users,
     route_prefix:"/api/v1/users",
