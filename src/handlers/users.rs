@@ -1,6 +1,6 @@
 use crate::config::AppError;
-use crate::dto::PaginatedResp;
 use crate::dto::PaginationQuery;
+use crate::dto::{PaginatedResp, Pagination};
 use crate::models::users;
 use crate::{ApiResponse, HttpResult, RouteInfo};
 use actix_web::{HttpResponse, web};

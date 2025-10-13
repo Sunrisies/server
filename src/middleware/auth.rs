@@ -48,14 +48,21 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let path = req.path().to_string(); // 克隆 path
-        let public_paths = [
+
+        // 完全匹配的路径
+        let exact_paths = [
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/sse",
             "/api/v1/ws",
-            "/api/v1/tags/",
         ];
-        if public_paths.contains(&path.as_str()) {
+        // 前缀匹配的路径
+
+        let prefix_paths = ["/api/v1/tags", "/api/v1/posts", "/api/v1/categories"];
+        let is_public = exact_paths.contains(&path.as_str())
+            || prefix_paths.iter().any(|&prefix| path.starts_with(prefix));
+
+        if is_public {
             // 公开路径，直接调用服务
             let fut = self.service.call(req);
             Box::pin(async move {
