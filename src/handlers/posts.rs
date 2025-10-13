@@ -27,9 +27,6 @@ pub async fn get_posts_all_handler(
     query: web::Query<PaginationQuery>,
 ) -> HttpResult {
     let PaginationQuery { page, limit } = query.into_inner();
-
-    // let limit = 16;
-    // let page = 0;
     // 1. 首先查询文章和分类（一对多关系）
     let paginator = posts::Entity::find()
         .find_also_related(categories::Entity)

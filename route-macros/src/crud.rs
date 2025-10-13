@@ -1,5 +1,5 @@
 use super::openapi::OpenApiGenerator;
-use crate::args::{CrudEntityConfig, CrudOperation, IdType};
+use crate::args::{CrudEntityConfig, CrudOperation, CustomQueryType, IdType};
 use crate::log::{LOGGER, LogLevel};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
@@ -13,7 +13,9 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     let route_prefix = &config.route_prefix;
     let permission_prefix = &config.permission_prefix;
     let id_type = config.id_type.unwrap_or(IdType::Uuid);
-
+    let custom_queries = config.custom_queries.unwrap_or_default();
+    let custom_list_fn = config.custom_list_fn;
+    let custom_read_fn = config.custom_read_fn;
     let operations = config.operations.unwrap_or_else(|| {
         vec![
             CrudOperation::Create,
@@ -52,6 +54,12 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     let module_name = entity.to_string();
     let mut operation_logs = Vec::new();
 
+    // 检查是否需要自定义查询
+    let use_custom_list = custom_queries.contains(&CustomQueryType::All)
+        || custom_queries.contains(&CustomQueryType::List);
+    let use_custom_read = custom_queries.contains(&CustomQueryType::All)
+        || custom_queries.contains(&CustomQueryType::Read);
+
     for operation in &operations {
         match operation {
             CrudOperation::Create => {
@@ -76,6 +84,8 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     &call_expr,
                     &openapi_gen,
                     id_type_str,
+                    use_custom_read,
+                    &custom_read_fn,
                 );
                 operation_logs.push(format!(
                     "读取操作: get_{}_handler",
@@ -97,7 +107,13 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                 ));
             }
             CrudOperation::List => {
-                list_code = generate_list_code(entity, route_prefix, permission_prefix);
+                list_code = generate_list_code(
+                    entity,
+                    route_prefix,
+                    permission_prefix,
+                    // use_custom_list,
+                    // &custom_list_fn,
+                );
                 operation_logs.push(format!(
                     "列表操作: get_{}_all_handler",
                     entity.to_string().to_lowercase()
@@ -136,6 +152,31 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             format!("生成模块: {}", mod_name),
         );
     });
+    // 记录自定义查询信息
+    if use_custom_list || use_custom_read {
+        let mut custom_logs = Vec::new();
+        if use_custom_list {
+            if let Some(ref fn_name) = custom_list_fn {
+                custom_logs.push(format!("自定义列表函数: {}", fn_name));
+            } else {
+                custom_logs.push("自定义列表函数: 使用默认命名".to_string());
+            }
+        }
+        if use_custom_read {
+            if let Some(ref fn_name) = custom_read_fn {
+                custom_logs.push(format!("自定义详情函数: {}", fn_name));
+            } else {
+                custom_logs.push("自定义详情函数: 使用默认命名".to_string());
+            }
+        }
+
+        LOGGER.with(|logger| {
+            let mut logger = logger.borrow_mut();
+            for log in custom_logs {
+                logger.log(&module_name, LogLevel::Info, log);
+            }
+        });
+    }
 
     let output = quote! {
         pub mod #mod_name {
@@ -159,44 +200,72 @@ fn generate_read_code(
     call_expr: &proc_macro2::TokenStream,
     openapi_gen: &OpenApiGenerator,
     id_type_str: &str,
+    use_custom: bool,
+    custom_fn: &Option<Ident>,
 ) -> proc_macro2::TokenStream {
     let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
     let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
     let full_path = format!("{}/{{id}}", route_prefix.value());
     let full_permission = format!("get::{}:read", permission_prefix.value());
     let openapi_doc = openapi_gen.generate_read_doc(id_type_str);
+    if use_custom {
+        let custom_fn_name = custom_fn.as_ref().unwrap_or(&get_fn);
 
-    quote! {
-
-        /// 获取实体
-        pub async fn #get_fn(
-            db: &DatabaseConnection,
-             #fn_arg,
-        ) -> Result<#entity::Model, AppError> {
-            #call_expr
-                .one(db)
-                .await
-                .map_err(|e| AppError::DatabaseError(e.to_string()))?
-                .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))
+        quote! {
+            #[crate::route_permission(
+                path = #full_path,
+                method = "get",
+                permission = #full_permission
+            )]
+            pub async fn #get_handler(
+                db: web::Data<DatabaseConnection>,
+                query: web::Query<PaginationQuery>,
+            ) -> HttpResult {
+                let PaginationQuery { page, limit } = query.into_inner();
+                match #custom_fn_name(db.get_ref(), page, limit).await {
+                    Ok(result) => Ok(result),
+                    Err(e) => {
+                        log::error!("自定义查询失败: {}", e);
+                        Ok(ApiResponse::from(AppError::DatabaseConnectionError(
+                            "查询失败".to_string(),
+                        )).to_http_response())
+                    }
+                }
+            }
         }
+    } else {
+        quote! {
 
-        #openapi_doc
-        #[crate::route_permission(
-            path = #full_path,
-            method = "get",
-            permission = #full_permission
-        )]
-        pub async fn #get_handler(
-            db: web::Data<DatabaseConnection>,
-            path: web::Path<#path_param_type>,
-        ) -> HttpResult {
-            let id = path.into_inner();
-            match #get_fn(db.get_ref(), id).await {
-                Ok(data) => Ok(ApiResponse::success(data,"获取成功").to_http_response()),
-                Err(AppError::NotFound(msg)) => {
-                    Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
-                },
-                _ => todo!()
+            /// 获取实体
+            pub async fn #get_fn(
+                db: &DatabaseConnection,
+                 #fn_arg,
+            ) -> Result<#entity::Model, AppError> {
+                #call_expr
+                    .one(db)
+                    .await
+                    .map_err(|e| AppError::DatabaseError(e.to_string()))?
+                    .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))
+            }
+
+            #openapi_doc
+            #[crate::route_permission(
+                path = #full_path,
+                method = "get",
+                permission = #full_permission
+            )]
+            pub async fn #get_handler(
+                db: web::Data<DatabaseConnection>,
+                path: web::Path<#path_param_type>,
+            ) -> HttpResult {
+                let id = path.into_inner();
+                match #get_fn(db.get_ref(), id).await {
+                    Ok(data) => Ok(ApiResponse::success(data,"获取成功").to_http_response()),
+                    Err(AppError::NotFound(msg)) => {
+                        Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+                    },
+                    _ => todo!()
+                }
             }
         }
     }

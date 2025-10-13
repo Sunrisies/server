@@ -3,6 +3,13 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Comma,
 };
+/// 自定义查询参数
+#[derive(Debug, PartialEq)]
+pub enum CustomQueryType {
+    List, // 自定义列表查询
+    Read, // 自定义详情查询
+    All,  // 所有查询都自定义
+}
 
 // ID 类型枚举
 #[derive(Debug, PartialEq)]
@@ -29,6 +36,9 @@ pub struct CrudEntityConfig {
     pub id_type: Option<IdType>,
     pub operations: Option<Vec<CrudOperation>>,
     pub create_request_type: Option<Ident>,
+    pub custom_queries: Option<Vec<CustomQueryType>>, // 新增：自定义查询类型
+    pub custom_list_fn: Option<Ident>,                // 新增：自定义列表查询函数名
+    pub custom_read_fn: Option<Ident>,                // 新增：自定义详情查询函数名
 }
 
 impl Parse for CrudEntityConfig {
@@ -41,6 +51,9 @@ impl Parse for CrudEntityConfig {
         let mut id_type = None;
         let mut operations = None;
         let mut create_request_type = None;
+        let mut custom_queries = None;
+        let mut custom_list_fn = None;
+        let mut custom_read_fn = None;
 
         while !content.is_empty() {
             let key: Ident = content.parse()?;
@@ -94,6 +107,36 @@ impl Parse for CrudEntityConfig {
                     let value: Ident = content.parse()?;
                     create_request_type = Some(value);
                 }
+                "custom_queries" => {
+                    let array: ExprArray = content.parse()?;
+                    let mut custom_query_types = Vec::new();
+                    for elem in array.elems {
+                        if let Expr::Lit(lit) = elem {
+                            if let syn::Lit::Str(lit_str) = lit.lit {
+                                match lit_str.value().as_str() {
+                                    "list" => custom_query_types.push(CustomQueryType::List),
+                                    "read" => custom_query_types.push(CustomQueryType::Read),
+                                    "all" => custom_query_types.push(CustomQueryType::All),
+                                    _ => {
+                                        return Err(syn::Error::new_spanned(
+                                            lit_str,
+                                            "Unknown custom query type",
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    custom_queries = Some(custom_query_types);
+                }
+                "custom_list_fn" => {
+                    let value: Ident = content.parse()?;
+                    custom_list_fn = Some(value);
+                }
+                "custom_read_fn" => {
+                    let value: Ident = content.parse()?;
+                    custom_read_fn = Some(value);
+                }
                 _ => {
                     return Err(syn::Error::new_spanned(key, "Unknown field"));
                 }
@@ -113,6 +156,9 @@ impl Parse for CrudEntityConfig {
             id_type,
             operations,
             create_request_type,
+            custom_queries,
+            custom_list_fn,
+            custom_read_fn,
         })
     }
 }
