@@ -15,7 +15,7 @@ crud_entity!({
     permission_prefix: "categories",
     id_type:"id",
     operations: ["create","list","delete","read"],
-    create_request_type: CreateCategoryRequest
+    create_request_type: CreateCategoryRequest,
 });
 
 // /// 创建分类
