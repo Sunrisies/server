@@ -3,6 +3,7 @@ use crate::utils::fmt_beijing;
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
@@ -19,6 +20,7 @@ pub struct Model {
     pub summary: Option<String>,
     #[sea_orm(column_type = "Text")]
     pub content: String,
+    pub markdowncontent: String,
     pub cover_image: Option<String>,
     pub status: i16,
     pub featured: bool,
@@ -89,4 +91,18 @@ impl Entity {
         Self::find().filter(Column::Uuid.eq(uuid))
     }
 }
+impl From<Model> for JsonValue {
+    fn from(model: Model) -> JsonValue {
+        serde_json::to_value(model).unwrap()
+    }
+}
+
+impl TryFrom<JsonValue> for Model {
+    type Error = serde_json::Error;
+
+    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
+        serde_json::from_value(value)
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}

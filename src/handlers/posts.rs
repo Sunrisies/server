@@ -4,23 +4,17 @@ use crate::dto::PaginationQuery;
 use crate::dto::common::Pagination;
 use crate::dto::posts::CategoryResponse;
 use crate::dto::posts::PostListResponse;
+use crate::dto::posts::PostResponse;
 use crate::dto::posts::TagResponse;
 use crate::models::{categories, post_tags, posts, tags};
-use crate::{ApiResponse, HttpResult, RouteInfo};
+use crate::{ApiResponse, HttpResult};
 use actix_web::web;
-use route_macros::crud_entity;
+use sea_orm::FromQueryResult;
+use sea_orm::sea_query::Alias;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, prelude::Expr,
 };
-
-crud_entity!({
-    entity : posts,
-    route_prefix:"/api/v1/posts",
-    permission_prefix: "posts",
-    id_type:"uuid",
-    operations: ["read"],
-    create_request_type: CreateTagRequest
-});
 
 pub async fn get_posts_all_handler(
     db_pool: web::Data<DatabaseConnection>,
@@ -42,8 +36,7 @@ pub async fn get_posts_all_handler(
             .to_http_response());
         }
     };
-    log::info!("total:{}", total);
-    let posts_with_categories = match paginator.fetch_page(page).await {
+    let posts_with_categories = match paginator.fetch_page(page - 1).await {
         Ok(list) => list,
         Err(e) => {
             log::error!("查询文章列表失败: {}", e);
@@ -86,7 +79,7 @@ pub async fn get_posts_all_handler(
         map
     };
     // 4. 构建最终的响应数据
-    let data: Vec<PostListResponse> = posts_with_categories
+    let data: Vec<PostResponse> = posts_with_categories
         .into_iter()
         .map(|(post, category_option)| {
             // 处理分类信息
@@ -101,11 +94,10 @@ pub async fn get_posts_all_handler(
             // 构建作者信息（这里需要根据您的用户表结构调整）
             let author = "朝阳".to_string(); // 您需要从用户表查询真实作者名
             // 构建响应对象
-            PostListResponse {
+            PostResponse {
                 id: post.id,
                 uuid: post.uuid,
                 title: post.title,
-                content: post.content,
                 cover: post.cover_image.unwrap_or_default(),
                 author,
                 publish_time: post.published_at,
@@ -121,9 +113,110 @@ pub async fn get_posts_all_handler(
             }
         })
         .collect();
+
     let resp = PaginatedResp {
         data,
         pagination: Pagination { total, page, limit },
     };
     Ok(ApiResponse::success(resp, "成功").to_http_response())
+}
+
+/// 现在请根据文章的创建时间返回时间轴,
+pub async fn get_timeline_handler(db_pool: web::Data<DatabaseConnection>) -> HttpResult {
+    #[derive(Debug, FromQueryResult)]
+    struct TimelineCount {
+        date: chrono::NaiveDate,
+        count: i64,
+    }
+    let timeline_data = posts::Entity::find()
+        .select_only()
+        .column_as(
+            Expr::col(posts::Column::CreatedAt).cast_as(sea_orm::sea_query::Alias::new("date")),
+            "date",
+        )
+        .column_as(Expr::col(posts::Column::Id).count(), "count")
+        .group_by(Expr::col(posts::Column::CreatedAt).cast_as(Alias::new("date")))
+        .order_by_desc(Expr::col(posts::Column::CreatedAt).cast_as(Alias::new("date")))
+        .into_model::<TimelineCount>()
+        .all(db_pool.as_ref())
+        .await
+        .unwrap_or_default();
+
+    let resp = timeline_data
+        .into_iter()
+        .map(|item| (item.date.format("%Y-%m-%d").to_string(), item.count))
+        .collect::<Vec<_>>();
+
+    Ok(ApiResponse::success(resp, "成功").to_http_response())
+}
+
+pub async fn get_posts_handler(
+    db_pool: web::Data<DatabaseConnection>,
+    page: web::Path<String>,
+) -> HttpResult {
+    let uuid = page.into_inner();
+
+    // 1. 查询文章和分类（通过 UUID）
+    let post_with_category = posts::Entity::find_by_uuid(&uuid)
+        .find_also_related(categories::Entity)
+        .one(db_pool.as_ref())
+        .await
+        .map_err(|e| {
+            log::error!("查询文章详情失败: {}", e);
+            AppError::DatabaseConnectionError("查询失败".to_string())
+        })?;
+
+    // 2. 检查文章是否存在
+    let (post, category_option) = match post_with_category {
+        Some(data) => data,
+        None => {
+            return Err(AppError::NotFound(String::from("文章不存在")));
+        }
+    };
+
+    // 3. 查询该文章的标签
+    let tag_relations = post_tags::Entity::find()
+        .filter(post_tags::Column::PostId.eq(post.id))
+        .find_also_related(tags::Entity)
+        .all(db_pool.as_ref())
+        .await
+        .unwrap_or_default();
+
+    let tags: Vec<TagResponse> = tag_relations
+        .into_iter()
+        .filter_map(|(_, tag_option)| tag_option)
+        .map(|tag| TagResponse {
+            id: tag.id,
+            name: tag.name,
+        })
+        .collect();
+
+    // 4. 构建响应数据
+    let category = category_option.map(|category| CategoryResponse {
+        id: category.id,
+        name: category.name,
+    });
+
+    let author = "朝阳".to_string(); // 这里需要从用户表查询真实作者名
+
+    let response = PostListResponse {
+        id: post.id,
+        uuid: post.uuid,
+        title: post.title,
+        content: post.markdowncontent,
+        cover: post.cover_image.unwrap_or_default(),
+        author,
+        publish_time: post.published_at,
+        update_time: post.updated_at,
+        views: post.view_count,
+        is_top: post.featured,
+        is_publish: post.status == 1,
+        is_hide: post.status == 2,
+        description: post.summary.unwrap_or_default(),
+        size: post.size,
+        category,
+        tags,
+    };
+
+    Ok(ApiResponse::success(response, "成功").to_http_response())
 }
