@@ -1,7 +1,7 @@
 use crate::config::AppError;
-use crate::dto::PaginatedResp;
 use crate::dto::PaginationQuery;
 use crate::dto::tag::CreateTagRequest;
+use crate::dto::{PaginatedResp, Pagination};
 use crate::models::tags;
 use crate::{ApiResponse, HttpResult, RouteInfo, utils::db_err_map};
 use actix_web::{HttpResponse, web};

@@ -7,6 +7,7 @@ use crate::{
         category::categories_routes::{
             create_categories_handler, get_categories_all_handler, get_categories_handler,
         },
+        posts::{get_posts_all_handler, posts_routes::get_posts_handler},
         register,
         tags::tags_routes::{create_tags_handler, delete_tags_handler, get_tags_all_handler},
         users::users_routes::{get_users_all_handler, get_users_handler},
@@ -42,6 +43,11 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                     .route("", web::get().to(get_tags_all_handler))
                     // .route("/{id}", web::put().to(handlers::category::update_category))
                     .route("/{uuid:.*}", web::delete().to(delete_tags_handler)),
+            )
+            .service(
+                web::scope("/v1/posts")
+                    .route("", web::get().to(get_posts_all_handler))
+                    .route("/{uuid:.*}", web::get().to(get_posts_handler)),
             ),
     );
 }

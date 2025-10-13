@@ -1,14 +1,17 @@
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
-
+#[derive(Serialize, ToSchema)]
+pub struct Pagination {
+    pub page: u64,
+    pub limit: u64,
+    pub total: u64,
+}
 /// 统一分页响应
 #[derive(Serialize, ToSchema)]
 pub struct PaginatedResp<T: Serialize> {
     pub data: Vec<T>,
-    pub page: u64,
-    pub limit: u64,
-    pub total: u64,
+    pub pagination: Pagination,
 }
 
 #[derive(Validate, Debug, Serialize, Deserialize, IntoParams)]

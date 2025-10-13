@@ -192,7 +192,7 @@ fn generate_read_code(
         ) -> HttpResult {
             let id = path.into_inner();
             match #get_fn(db.get_ref(), id).await {
-                Ok(data) => Ok(HttpResponse::Ok().json(data)),
+                Ok(data) => Ok(ApiResponse::success(data,"获取成功").to_http_response()),
                 Err(AppError::NotFound(msg)) => {
                     Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
                 },
@@ -328,17 +328,7 @@ fn generate_list_code(
             page: u64,
             limit: u64,
         ) -> Result<HttpResponse,AppError> {
-            // match #entity::Entity::find()
-            //         .limit(limit)
-            //         .offset((page - 1) * limit)
-            //         .all(db_pool)
-            //         .await {
-            //         Ok(data) => Ok(HttpResponse::Ok().json(data)),
-            //         Err(e) => {
-            //             println!("Database query error: {}", e);
-            //             Err(AppError::DatabaseConnectionError(e.to_string()))
-            //         }
-            // }
+
         // 1. 建立分页器
         let paginator = #entity::Entity::find().paginate(db_pool, limit);
 
@@ -368,9 +358,11 @@ fn generate_list_code(
         // 3. 组装成前端需要的分页结构
         let resp = PaginatedResp {
             data,
-            total, // u64 -> usize
-            page,
-            limit,
+            pagination:Pagination{
+                total, // u64 -> usize
+                page,
+                limit,
+            }
         };
 
         // 4. 统一出口
