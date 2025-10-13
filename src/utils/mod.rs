@@ -5,5 +5,6 @@ pub use db_error::db_err_map;
 mod fmt_time;
 pub use fmt_time::fmt_beijing;
 pub mod crypto_pwd;
+pub mod data_processing;
 pub mod jwt;
 pub mod perm_cache;
