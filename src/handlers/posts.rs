@@ -10,11 +10,14 @@ use crate::models::{categories, post_tags, posts, tags};
 use crate::{ApiResponse, HttpResult};
 use actix_web::web;
 use sea_orm::FromQueryResult;
+use sea_orm::Order;
 use sea_orm::sea_query::Alias;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, prelude::Expr,
 };
+use serde::Serialize;
+use tokio::try_join;
 
 pub async fn get_posts_all_handler(
     db_pool: web::Data<DatabaseConnection>,
@@ -219,4 +222,66 @@ pub async fn get_posts_handler(
     };
 
     Ok(ApiResponse::success(response, "成功").to_http_response())
+}
+/// prevNext 或者文章的上一篇跟下一篇
+/// prevNext 或者文章的上一篇跟下一篇
+pub async fn get_prev_next_handler(
+    db_pool: web::Data<DatabaseConnection>,
+    page: web::Path<String>,
+) -> HttpResult {
+    #[derive(Debug, FromQueryResult, Serialize)]
+    struct PrevNextResponse {
+        title: String,
+        uuid: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    struct PrevNextResult {
+        #[serde(rename = "prevArticle")]
+        prev_article: Option<PrevNextResponse>,
+        #[serde(rename = "nextArticle")]
+        next_article: Option<PrevNextResponse>,
+    }
+
+    // 将转换函数提取出来，避免重复
+    fn to_response(post: posts::Model) -> PrevNextResponse {
+        PrevNextResponse {
+            uuid: post.uuid,
+            title: post.title,
+        }
+    }
+
+    let uuid = page.into_inner();
+    // 查询当前文章，使用更简洁的错误处理
+    let post = posts::Entity::find_by_uuid(&uuid)
+        .one(db_pool.as_ref())
+        .await?
+        .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
+
+    // 并行查询上一篇和下一篇文章
+    let (prev, next) = try_join!(
+        // 查询上一篇（创建时间更早的）
+        posts::Entity::find()
+            .filter(posts::Column::CreatedAt.lt(post.created_at))
+            .order_by(posts::Column::CreatedAt, Order::Desc)
+            .one(db_pool.as_ref()),
+        // 查询下一篇（创建时间更晚的）
+        posts::Entity::find()
+            .filter(posts::Column::CreatedAt.gt(post.created_at))
+            .order_by(posts::Column::CreatedAt, Order::Asc)
+            .one(db_pool.as_ref())
+    )
+    .map_err(|e| {
+        log::error!("数据库操作失败: {}", e);
+        AppError::DatabaseError("服务器异常，请联系管理员".to_string())
+    })?;
+    log::info!("prev: {:?}, next: {:?}", prev, next);
+    Ok(ApiResponse::success(
+        PrevNextResult {
+            prev_article: prev.map(to_response),
+            next_article: next.map(to_response),
+        },
+        "成功",
+    )
+    .to_http_response())
 }
