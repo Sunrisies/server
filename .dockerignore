@@ -1,0 +1,12 @@
+target/
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+out
+postgresql
+migration
+.vscode
+.github
+logs
