@@ -6,3 +6,4 @@ change-commit-date.sh
 /out
 /logs
 openapi.json
+git_purge_file.sh
