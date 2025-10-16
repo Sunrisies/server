@@ -1,5 +1,5 @@
-use sea_orm::ActiveValue::Set;
-use serde::Deserialize;
+use sea_orm::{ActiveValue::Set, FromQueryResult};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::models::tags;
@@ -22,4 +22,11 @@ impl From<CreateTagRequest> for tags::ActiveModel {
             ..Default::default()
         }
     }
+}
+
+#[derive(Debug, Serialize, FromQueryResult)]
+pub struct TagCloudItem {
+    pub id: i32,
+    pub name: String,
+    pub count: i64,
 }
