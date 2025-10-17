@@ -224,7 +224,6 @@ pub async fn get_posts_handler(
     Ok(ApiResponse::success(response, "成功").to_http_response())
 }
 /// prevNext 或者文章的上一篇跟下一篇
-/// prevNext 或者文章的上一篇跟下一篇
 pub async fn get_prev_next_handler(
     db_pool: web::Data<DatabaseConnection>,
     page: web::Path<String>,
