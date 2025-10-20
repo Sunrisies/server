@@ -8,3 +8,4 @@ pub mod crypto_pwd;
 pub mod data_processing;
 pub mod jwt;
 pub mod perm_cache;
+pub mod websocket;

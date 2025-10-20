@@ -8,6 +8,8 @@ pub mod post_tags;
 pub mod posts;
 pub mod role_permissions;
 pub mod roles;
+pub mod room_messages;
+pub mod rooms;
 pub mod tags;
 pub mod user_permissions;
 pub mod user_roles;

@@ -40,6 +40,7 @@ uuid = { version = "1.18.0", features = ["v4"] }
 validator = { version = "0.20.0", features = ["derive"] }
 route-macros = { path = "./route-macros" }
 inventory = "0.3.21"
+actix-rt = "2.11.0"
 
 
 [profile.dev]

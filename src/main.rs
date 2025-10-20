@@ -1,3 +1,5 @@
+use tokio::sync::Mutex;
+
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, web};
 use anyhow::{Context, Result};
@@ -6,7 +8,7 @@ use server::{
     config::{init_logger, write_to_file},
     config_routes, create_db_pool, get_all_routes, init_route_registry,
     middleware::auth::Auth,
-    utils::perm_cache::load_perm_cache,
+    utils::{perm_cache::load_perm_cache, websocket::ChatServer},
 };
 
 #[actix_web::main]
@@ -29,6 +31,8 @@ async fn main() -> Result<()> {
     load_perm_cache(&db_pool.clone()).await.unwrap();
     // 添加sse
     let notifier = web::Data::new(SseNotifier::new());
+    let chat_server = web::Data::new(Mutex::new(ChatServer::new()));
+
     write_to_file(); // api_doc生成文件
     println!("Server running on http://127.0.0.1:2345");
     let server = HttpServer::new(move || {
@@ -41,6 +45,7 @@ async fn main() -> Result<()> {
         App::new()
             .app_data(db_pool.clone())
             .app_data(notifier.clone())
+            .app_data(chat_server.clone()) // 共享聊天服务器状态
             .configure(config_routes)
             .wrap(actix_web::middleware::Logger::default())
             .wrap(cors)

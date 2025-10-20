@@ -3,5 +3,7 @@
 pub use super::categories::Entity as Categories;
 pub use super::post_tags::Entity as PostTags;
 pub use super::posts::Entity as Posts;
+pub use super::room_messages::Entity as Messages;
+pub use super::rooms::Entity as Rooms;
 pub use super::tags::Entity as Tags;
 pub use super::users::Entity as Users;

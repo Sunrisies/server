@@ -6,3 +6,4 @@ pub mod tags;
 pub mod users;
 pub use users::users_routes::*;
 pub mod posts;
+pub mod rooms;
