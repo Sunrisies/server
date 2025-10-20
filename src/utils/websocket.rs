@@ -12,6 +12,7 @@ pub struct ClientMessage {
     pub file_name: Option<String>,
     pub file_size: Option<i32>,
     pub retention_hours: Option<i32>,
+    pub user_nickname: Option<String>,
 }
 
 // 服务器广播的消息格式
@@ -19,6 +20,7 @@ pub struct ClientMessage {
 pub struct BroadcastMessage {
     pub room_id: String,
     pub message_type: String,
+    pub user_nickname: Option<String>,
     pub content: Option<String>,
     pub file_url: Option<String>,
     pub file_name: Option<String>,
@@ -85,6 +87,7 @@ impl ChatServer {
     pub async fn broadcast_system_message(&mut self, room_id: &str, content: &str) {
         let system_message = BroadcastMessage {
             room_id: room_id.to_string(),
+            user_nickname: Some("系统消息".to_string()),
             message_type: "system".to_string(),
             content: Some(content.to_string()),
             file_url: None,

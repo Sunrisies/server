@@ -38,6 +38,7 @@ async fn main() -> Result<()> {
     let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://127.0.0.1:5502")
+            .allowed_origin("http://127.0.0.1:12002")
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec!["Content-Type", "Authorization", "ACCEPT"])
             .supports_credentials()
@@ -47,8 +48,8 @@ async fn main() -> Result<()> {
             .app_data(notifier.clone())
             .app_data(chat_server.clone()) // 共享聊天服务器状态
             .configure(config_routes)
-            .wrap(actix_web::middleware::Logger::default())
             .wrap(cors)
+            .wrap(actix_web::middleware::Logger::default())
             .wrap(Auth)
     });
 

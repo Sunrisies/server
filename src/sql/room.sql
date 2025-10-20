@@ -1,6 +1,7 @@
 -- 房间表 - 存储聊天房间的基本信息
 CREATE TABLE rooms (
-    id VARCHAR(50) PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
+    uuid CHAR(36) NOT NULL,
     -- 房间ID，主键，用户自定义的唯一标识
     name VARCHAR(100) NOT NULL,
     -- 房间名称，必填
@@ -17,6 +18,8 @@ COMMENT ON TABLE rooms IS '聊天房间表，存储所有聊天房间的基本�
 
 COMMENT ON COLUMN rooms.id IS '房间唯一标识符，用户自定义的字符串ID';
 
+COMMENT ON COLUMN rooms.uuid IS '房间唯一标识符，系统自动生成的UUID';
+
 COMMENT ON COLUMN rooms.name IS '房间显示名称，用于界面展示';
 
 COMMENT ON COLUMN rooms.description IS '房间描述信息，可选的详细说明';
@@ -31,7 +34,7 @@ COMMENT ON COLUMN rooms.updated_at IS '房间最后更新时间戳';
 CREATE TABLE room_messages (
     id SERIAL PRIMARY KEY,
     -- 消息ID，自增主键
-    room_id VARCHAR(50) REFERENCES rooms(id) ON DELETE CASCADE,
+    room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     -- 外键，关联到房间表，级联删除
     message_type VARCHAR(20) NOT NULL CHECK (
         -- 消息类型，限制为指定类型

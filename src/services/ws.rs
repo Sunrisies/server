@@ -118,6 +118,10 @@ async fn handle_ws_messages(
                     Ok(client_msg) => {
                         // 创建广播消息
                         let broadcast_msg = BroadcastMessage {
+                            user_nickname: Some(
+                                client_msg.user_nickname.unwrap_or("系统回复".to_string()),
+                            ),
+
                             room_id: room_id.clone(),
                             message_type: client_msg.message_type,
                             content: client_msg.content,
@@ -217,13 +221,6 @@ async fn save_message_to_db(
         retention_hours: Set(Some(msg.retention_hours)),
         created_at: Set(Utc::now()),
         expires_at: Set(Utc::now()),
-        // created_at: Set(Some(
-        //     msg.timestamp.with_timezone(&chrono::FixedOffset::east(0)),
-        // )),
-        // expires_at: Set(Some(
-        //     (msg.timestamp + chrono::Duration::hours(msg.retention_hours as i64))
-        //         .with_timezone(&chrono::FixedOffset::east(0)),
-        // )),
         ..Default::default()
     };
 

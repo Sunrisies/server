@@ -1,12 +1,13 @@
+use crate::{HttpResult, config::AppError};
 use actix_web::{HttpResponse, Result, web};
-use sea_orm::{ActiveValue, EntityTrait, prelude::*};
+use chrono::Utc;
+use sea_orm::{ActiveValue::Set, EntityTrait, prelude::*};
 use serde::{Deserialize, Serialize};
 
-use crate::models::rooms;
+use crate::{ApiResponse, models::rooms};
 
 #[derive(Deserialize)]
 pub struct CreateRoomRequest {
-    pub id: String,
     pub name: String,
     pub description: Option<String>,
     pub max_users: Option<i32>,
@@ -19,44 +20,41 @@ pub struct RoomResponse {
     pub description: Option<String>,
     pub max_users: i32,
     pub user_count: i32,
-    // pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
 pub async fn create_room_handler(
     db: web::Data<DatabaseConnection>,
     room_data: web::Json<CreateRoomRequest>,
-) -> Result<HttpResponse> {
-    let room = rooms::ActiveModel {
-        id: ActiveValue::Set(room_data.id.clone()),
-        name: ActiveValue::Set(room_data.name.clone()),
-        description: ActiveValue::Set(room_data.description.clone()),
-        max_users: ActiveValue::Set(Some(room_data.max_users.unwrap_or(100))),
-        created_at: ActiveValue::Set(None),
-        updated_at: ActiveValue::Set(None),
-    };
-
-    match rooms::Entity::insert(room).exec(db.get_ref()).await {
-        Ok(_) => Ok(HttpResponse::Created().json("Room created successfully")),
-        Err(e) => Ok(HttpResponse::BadRequest().json(format!("Error creating room: {}", e))),
+) -> HttpResult {
+    // 先检查房间是否已存在
+    let existing_room = rooms::Entity::find()
+        .filter(rooms::Column::Name.eq(room_data.name.clone()))
+        .one(db.get_ref())
+        .await
+        .map_err(|_| AppError::DatabaseError(String::from("检查房间是否存在失败")))?;
+    if existing_room.is_some() {
+        return Ok(ApiResponse::<()>::success_msg("房间已存在").to_http_response());
     }
+    let new_room = rooms::ActiveModel {
+        uuid: Set(Uuid::new_v4().to_string()),
+        name: Set(room_data.name.clone()),
+        description: Set(room_data.description.clone()),
+        max_users: Set(Some(room_data.max_users.unwrap_or(100))),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    };
+    let room = new_room
+        .insert(db.get_ref())
+        .await
+        .map_err(|_| AppError::DatabaseError(String::from("插入房间失败")))?;
+
+    Ok(ApiResponse::success(room, "创建房间成功").to_http_response())
 }
 
 pub async fn get_room_handler(
-    db: web::Data<DatabaseConnection>,
-    room_id: web::Path<String>,
+    _db: web::Data<DatabaseConnection>,
+    _room_id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    let room = rooms::Entity::find_by_id(room_id.into_inner())
-        .one(db.get_ref())
-        .await
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-    match room {
-        Some(room) => Ok(HttpResponse::Ok().json(RoomResponse {
-            id: room.id,
-            name: room.name,
-            description: room.description,
-            max_users: room.max_users.unwrap_or(100),
-            user_count: 0,
-        })),
-        None => Ok(HttpResponse::NotFound().json("Room not found")),
-    }
+    Ok(HttpResponse::Ok().json("Room created successfully"))
 }

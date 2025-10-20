@@ -48,7 +48,6 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let path = req.path().to_string(); // 克隆 path
-
         // 完全匹配的路径
         let exact_paths = [
             "/api/v1/auth/login",
