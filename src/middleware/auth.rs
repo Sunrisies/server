@@ -77,7 +77,7 @@ where
         } else {
             // 需要认证的路径，先检查cookie
             let cookie_result = req.cookie("access_token").ok_or_else(|| {
-                log::error!("access_token not found");
+                log::error!("access_token not found, path: {}", path);
                 AppError::Unauthorized("access_token not found".to_string())
             });
             match cookie_result {

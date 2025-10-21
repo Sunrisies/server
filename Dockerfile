@@ -15,4 +15,6 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/target/release/server .
 COPY --from=builder /app/.env .
+# 复制版本信息文件
+COPY --from=builder /app/.docker/version.json .
 CMD ["./server"]
