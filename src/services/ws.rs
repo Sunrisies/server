@@ -61,7 +61,7 @@ pub async fn chat_route(
         path.0, path.1
     );
 
-    let (room_id, _user_id) = path.into_inner();
+    let (room_name, user_name) = path.into_inner();
 
     // 建立WebSocket连接
     let (response, session, msg_stream) = actix_ws::handle(&req, stream)?;
@@ -69,17 +69,17 @@ pub async fn chat_route(
     // 添加到聊天服务器
     let session_id = {
         let mut server = chat_server.lock().await;
-        server.add_session(room_id.clone(), session.clone())
+        server.add_session(room_name.clone(), session.clone())
     };
 
     // 广播用户加入消息
     {
         let mut server = chat_server.lock().await;
-        let user_count = server.get_room_user_count(&room_id);
+        let user_count = server.get_room_user_count(&room_name);
         server
             .broadcast_system_message(
-                &room_id,
-                &format!("User joined the room. Online users: {}", user_count),
+                &room_name,
+                &format!("用户已加入房间。在线用户: {}", user_count),
             )
             .await;
     }
@@ -89,7 +89,7 @@ pub async fn chat_route(
         session,
         msg_stream,
         chat_server,
-        room_id,
+        user_name,
         session_id,
         db_pool_clone,
     ));
@@ -102,7 +102,7 @@ async fn handle_ws_messages(
     mut session: Session,
     mut msg_stream: actix_ws::MessageStream,
     chat_server: web::Data<Mutex<ChatServer>>,
-    room_id: String,
+    room_name: String,
     session_id: String,
     db_pool: web::Data<DatabaseConnection>,
 ) {
@@ -111,7 +111,10 @@ async fn handle_ws_messages(
     while let Some(Ok(msg)) = msg_stream.next().await {
         match msg {
             Message::Text(text) => {
-                println!("Received text message from  in room {}: {}", room_id, text);
+                println!(
+                    "Received text message from  in room {}: {}",
+                    room_name, text
+                );
 
                 // 解析客户端消息
                 match serde_json::from_str::<ClientMessage>(&text) {
@@ -121,8 +124,8 @@ async fn handle_ws_messages(
                             user_nickname: Some(
                                 client_msg.user_nickname.unwrap_or("系统回复".to_string()),
                             ),
-
-                            room_id: room_id.clone(),
+                            room_id: client_msg.room_id,
+                            room_name: room_name.clone(),
                             message_type: client_msg.message_type,
                             content: client_msg.content,
                             file_url: client_msg.file_url,
@@ -161,7 +164,7 @@ async fn handle_ws_messages(
             Message::Binary(bin) => {
                 println!(
                     "Received binary message from in room {}: {} bytes",
-                    room_id,
+                    room_name,
                     bin.len()
                 );
 
@@ -170,19 +173,19 @@ async fn handle_ws_messages(
                 let _ = session.binary(bin).await;
             }
             Message::Ping(bytes) => {
-                println!("Received ping from in room {}", room_id);
+                println!("Received ping from in room {}", room_name);
                 let _ = session.pong(&bytes).await;
             }
             Message::Pong(_) => {
                 // 忽略pong消息
             }
             Message::Close(reason) => {
-                println!("WebSocket closed by  in room {}: {:?}", room_id, reason);
+                println!("WebSocket closed by  in room {}: {:?}", room_name, reason);
                 break;
             }
             Message::Continuation(_) => {
                 // 处理continuation帧
-                println!("Received continuation frame from in room {}", room_id);
+                println!("Received continuation frame from in room {}", room_name);
             }
             Message::Nop => {
                 // 无操作
@@ -191,17 +194,17 @@ async fn handle_ws_messages(
     }
 
     // 连接断开，从聊天服务器移除
-    println!("WebSocket connection closed for  in room {}", room_id);
+    println!("WebSocket connection closed for  in room {}", room_name);
 
     {
         let mut server = chat_server.lock().await;
-        server.remove_session(&room_id, &session_id);
-        let user_count = server.get_room_user_count(&room_id);
+        server.remove_session(&room_name, &session_id);
+        let user_count = server.get_room_user_count(&room_name);
         // 广播用户离开消息
         server
             .broadcast_system_message(
-                &room_id,
-                &format!("A user left the room. Online users: {}", user_count),
+                &room_name,
+                &format!("一位用户离开了房间。在线用户: {}", user_count),
             )
             .await;
     }
@@ -211,8 +214,10 @@ async fn save_message_to_db(
     db: &DatabaseConnection,
     msg: &BroadcastMessage,
 ) -> Result<(), sea_orm::DbErr> {
+    // 根据房间号去查房间id
+    log::info!("msg: {:?}", msg);
     let new_message = room_messages::ActiveModel {
-        room_id: Set(Some(msg.room_id.clone())),
+        room_id: Set(Some(msg.room_id)),
         message_type: Set(msg.message_type.clone()),
         content: Set(msg.content.clone()),
         file_url: Set(msg.file_url.clone()),

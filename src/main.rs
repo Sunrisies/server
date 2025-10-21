@@ -1,7 +1,7 @@
 use tokio::sync::Mutex;
 
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, web};
+use actix_web::{App, HttpServer, http, web};
 use anyhow::{Context, Result};
 use server::{
     SseNotifier,
@@ -39,8 +39,20 @@ async fn main() -> Result<()> {
         let cors = Cors::default()
             .allowed_origin("http://127.0.0.1:5502")
             .allowed_origin("http://127.0.0.1:12002")
-            .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-            .allowed_headers(vec!["Content-Type", "Authorization", "ACCEPT"])
+            .allowed_origin("http://localhost:12002")
+            // .allow_any_origin()
+            .allowed_methods(vec![
+                http::Method::GET,
+                http::Method::POST,
+                http::Method::PUT,
+                http::Method::DELETE,
+                http::Method::OPTIONS,
+            ])
+            .allowed_headers(vec![
+                http::header::AUTHORIZATION,
+                http::header::ACCEPT,
+                http::header::CONTENT_TYPE,
+            ])
             .supports_credentials()
             .max_age(3600);
         App::new()
@@ -48,8 +60,8 @@ async fn main() -> Result<()> {
             .app_data(notifier.clone())
             .app_data(chat_server.clone()) // 共享聊天服务器状态
             .configure(config_routes)
-            .wrap(cors)
             .wrap(actix_web::middleware::Logger::default())
+            .wrap(cors)
             .wrap(Auth)
     });
 

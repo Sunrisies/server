@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub room_id: Option<String>,
+    pub room_id: Option<i32>,
     pub message_type: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub content: Option<String>,

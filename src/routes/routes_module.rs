@@ -11,6 +11,7 @@ use crate::{
             get_posts_all_handler, get_posts_handler, get_prev_next_handler, get_timeline_handler,
         },
         register,
+        room_messages::get_room_messages_handler,
         rooms::{create_room_handler, get_room_handler},
         tags::{
             get_posts_by_tag_handler, get_tags_with_count_handler,
@@ -64,7 +65,11 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                 web::scope("/v1/rooms")
                     .route("/ws/{room_id}/{user_id}", web::get().to(chat_route))
                     .route("", web::post().to(create_room_handler))
-                    .route("/{room_id}", web::get().to(get_room_handler)),
+                    .route("/{room_id}", web::get().to(get_room_handler))
+                    .route(
+                        "{room_id}/messages",
+                        web::get().to(get_room_messages_handler),
+                    ),
             ),
     );
 }

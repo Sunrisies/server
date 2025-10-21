@@ -53,8 +53,14 @@ pub async fn create_room_handler(
 }
 
 pub async fn get_room_handler(
-    _db: web::Data<DatabaseConnection>,
-    _room_id: web::Path<String>,
+    db_pool: web::Data<DatabaseConnection>,
+    room_name: web::Path<String>,
 ) -> Result<HttpResponse> {
-    Ok(HttpResponse::Ok().json("Room created successfully"))
+    let existing_room = rooms::Entity::find()
+        .filter(rooms::Column::Name.eq(room_name.clone()))
+        .one(db_pool.get_ref())
+        .await
+        .map_err(|_| AppError::DatabaseError(String::from("检查房间是否存在失败")))?;
+    Ok(ApiResponse::success(existing_room, "查询成功").to_http_response())
+    // Ok(HttpResponse::Ok().json("Room created successfully"))
 }
