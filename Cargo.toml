@@ -41,6 +41,13 @@ validator = { version = "0.20.0", features = ["derive"] }
 route-macros = { path = "./route-macros" }
 inventory = "0.3.21"
 actix-rt = "2.11.0"
+actix-multipart = "0.7.2"
+image = { version = "0.25.8", default-features = false, features = [
+    "png",
+    "jpeg",
+    "webp",
+] }
+qiniu-upload-manager = "0.2.4"
 
 
 [profile.dev]

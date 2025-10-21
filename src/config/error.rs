@@ -171,6 +171,12 @@ impl From<std::io::Error> for AppError {
         AppError::InternalServerError(format!("IO error: {}", error))
     }
 }
+/// actix_multipart
+impl From<actix_multipart::MultipartError> for AppError {
+    fn from(error: actix_multipart::MultipartError) -> Self {
+        AppError::UploadFailed(format!("Multipart error: {}", error))
+    }
+}
 
 impl From<argon2::password_hash::Error> for AppError {
     fn from(error: argon2::password_hash::Error) -> Self {

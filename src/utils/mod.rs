@@ -6,6 +6,7 @@ mod fmt_time;
 pub use fmt_time::fmt_beijing;
 pub mod crypto_pwd;
 pub mod data_processing;
+pub mod file_size;
 pub mod jwt;
 pub mod perm_cache;
 pub mod websocket;

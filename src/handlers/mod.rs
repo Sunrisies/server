@@ -8,3 +8,4 @@ pub use users::users_routes::*;
 pub mod posts;
 pub mod room_messages;
 pub mod rooms;
+pub mod upload;

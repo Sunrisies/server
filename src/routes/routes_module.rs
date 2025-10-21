@@ -17,6 +17,7 @@ use crate::{
             get_posts_by_tag_handler, get_tags_with_count_handler,
             tags_routes::{create_tags_handler, delete_tags_handler, get_tags_all_handler},
         },
+        upload::upload_file_handler,
         users::users_routes::{get_users_all_handler, get_users_handler},
     },
     sse_stream,
@@ -70,6 +71,7 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                         "{room_id}/messages",
                         web::get().to(get_room_messages_handler),
                     ),
-            ),
+            )
+            .service(web::scope("/v1/upload").route("", web::post().to(upload_file_handler))),
     );
 }
