@@ -3202,45 +3202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "server"
-version = "0.1.2"
-dependencies = [
- "actix-cors",
- "actix-multipart",
- "actix-rt",
- "actix-web",
- "actix-web-lab",
- "actix-ws",
- "anyhow",
- "argon2",
- "base64 0.22.1",
- "chrono",
- "dotenvy",
- "ed25519-dalek",
- "futures-util",
- "image",
- "inventory",
- "jsonwebtoken",
- "lazy_static",
- "log",
- "log4rs",
- "md5",
- "nu-ansi-term",
- "once_cell",
- "qiniu-upload-manager",
- "regex",
- "route-macros",
- "sea-orm",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "utoipa",
- "uuid",
- "validator",
-]
-
-[[package]]
 name = "sha-1"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4207,6 +4168,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bad67dc8b2a1a6e5448428adec4c3e84c43e561d8c9ee8a9e5aabeb193ec41d1"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "web-server"
+version = "0.1.8"
+dependencies = [
+ "actix-cors",
+ "actix-multipart",
+ "actix-rt",
+ "actix-web",
+ "actix-web-lab",
+ "actix-ws",
+ "anyhow",
+ "argon2",
+ "base64 0.22.1",
+ "chrono",
+ "dotenvy",
+ "ed25519-dalek",
+ "futures-util",
+ "image",
+ "inventory",
+ "jsonwebtoken",
+ "lazy_static",
+ "log",
+ "log4rs",
+ "md5",
+ "nu-ansi-term",
+ "once_cell",
+ "qiniu-upload-manager",
+ "regex",
+ "route-macros",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "utoipa",
+ "uuid",
+ "validator",
 ]
 
 [[package]]

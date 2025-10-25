@@ -10,6 +10,7 @@ REMOTE_DIR="/home/docker/server"
 CONTAINER_NAME="web-server"
 PORT_MAPPING="22345:2345"
 VOLUME_MAPPING="/home/docker/server/web_server:/home/app/logs"
+KEEP_IMAGE_VERSIONS=2  # 本地保留最近2个版本
 
 # 颜色定义
 RED='\033[0;31m'
@@ -22,6 +23,13 @@ NC='\033[0m' # No Color
 CURRENT_VERSION=""
 NEW_VERSION=""
 NEXT_VERSION=""
+BUILD_TIMESTAMP=""
+
+# 备份文件
+BACKUP_CARGO_TOML=""
+
+# 部署状态
+DEPLOYMENT_SUCCESS=false
 
 # 日志函数
 log() {
@@ -110,6 +118,36 @@ increment_version() {
   echo "$major.$minor.$patch"
 }
 
+# 备份重要文件
+backup_files() {
+  log "备份重要文件..."
+
+  # 备份 Cargo.toml
+  if [ -f "Cargo.toml" ]; then
+    BACKUP_CARGO_TOML=$(mktemp)
+    cp Cargo.toml "$BACKUP_CARGO_TOML"
+    log "已备份 Cargo.toml"
+  fi
+}
+
+# 恢复备份文件
+restore_backup_files() {
+  log "恢复备份文件..."
+
+  if [ -n "$BACKUP_CARGO_TOML" ] && [ -f "$BACKUP_CARGO_TOML" ]; then
+    cp "$BACKUP_CARGO_TOML" Cargo.toml
+    log "已恢复 Cargo.toml"
+    rm -f "$BACKUP_CARGO_TOML"
+  fi
+}
+
+# 清理备份文件
+cleanup_backup_files() {
+  if [ -n "$BACKUP_CARGO_TOML" ] && [ -f "$BACKUP_CARGO_TOML" ]; then
+    rm -f "$BACKUP_CARGO_TOML"
+  fi
+}
+
 # 更新版本号
 update_version() {
   if [ -f "Cargo.toml" ]; then
@@ -121,8 +159,9 @@ update_version() {
     # 更新 Cargo.toml 中的版本号
     sed -i "s/^version = \".*\"/version = \"$NEXT_VERSION\"/" Cargo.toml
 
-    # 使用时间戳作为构建版本
-    NEW_VERSION="${NEXT_VERSION}-$(date +%Y%m%d%H%M%S)"
+    # 生成构建时间戳
+    BUILD_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+    NEW_VERSION="${NEXT_VERSION}-${BUILD_TIMESTAMP}"
 
     log "版本号已更新: $CURRENT_VERSION → $NEXT_VERSION (构建标签: $NEW_VERSION)"
   else
@@ -151,6 +190,7 @@ generate_version_info() {
   \"previousVersion\": \"${CURRENT_VERSION:-unknown}\",
   \"build\": \"${NEW_VERSION}\",
   \"buildDate\": \"$(date -Iseconds)\",
+  \"buildTimestamp\": \"$BUILD_TIMESTAMP\",
   \"gitHash\": \"$git_hash\",
   \"gitBranch\": \"$git_branch\",
   \"environment\": \"production\",
@@ -165,7 +205,9 @@ generate_version_info() {
 
 # 提交版本更新到 Git（可选）
 commit_version_update() {
-  if [ -d ".git" ] && [ -n "$(git status --porcelain Cargo.toml)" ]; then
+  log "检查 Git 提交..."
+
+  if [ -d ".git" ] && git status --porcelain Cargo.toml | grep -q "Cargo.toml"; then
     log "正在提交版本更新到 Git..."
     git add Cargo.toml
     git commit -m "chore: bump version to $NEXT_VERSION [deploy]"
@@ -219,7 +261,28 @@ run_tests() {
   fi
 }
 
-# 使用 Docker 多阶段构建 Rust 项目
+# 构建 Rust 项目
+build_rust_project() {
+  log "正在构建 Rust 项目..."
+
+  if command -v cargo &> /dev/null; then
+    cargo build --release
+    check_success "Rust 项目构建"
+
+    # 检查生成的可执行文件
+    if [ -f "target/release/$PROJECT_NAME" ]; then
+      log_success "Rust 项目构建成功，可执行文件大小: $(du -h target/release/$PROJECT_NAME | cut -f1)"
+    else
+      log_error "未找到构建的可执行文件: target/release/$PROJECT_NAME"
+      return 1
+    fi
+  else
+    log_error "未找到 cargo 命令"
+    return 1
+  fi
+}
+
+# 使用 Docker 构建项目
 build_with_docker() {
   log "正在使用 Docker 构建 Rust 项目..."
 
@@ -235,6 +298,9 @@ build_with_docker() {
     --platform linux/amd64 \
     -t $IMAGE_NAME:$NEW_VERSION \
     -t $IMAGE_NAME:latest \
+    --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP \
+    --build-arg GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+    --build-arg PROJECT_VERSION=$NEXT_VERSION \
     .
 
   check_success "Docker 镜像构建"
@@ -266,6 +332,79 @@ upload_to_remote() {
   log "正在上传 $LOCAL_TAR_FILE 到 $REMOTE_HOST..."
   scp $LOCAL_TAR_FILE $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/
   check_success "文件上传"
+}
+
+# 清理本地 Docker 镜像（当前构建的）
+cleanup_local_images() {
+  log "正在清理本地 Docker 镜像（当前构建的）..."
+
+  # 删除特定版本的镜像
+  if docker image inspect $IMAGE_NAME:$NEW_VERSION &> /dev/null; then
+    docker rmi $IMAGE_NAME:$NEW_VERSION
+    log_success "已删除本地镜像: $IMAGE_NAME:$NEW_VERSION"
+  else
+    log "本地镜像 $IMAGE_NAME:$NEW_VERSION 不存在，无需删除"
+  fi
+
+  # 清理悬空镜像
+  local dangling_images=$(docker images -f "dangling=true" -q)
+  if [ -n "$dangling_images" ]; then
+    docker rmi $dangling_images 2>/dev/null || log "无法删除部分悬空镜像"
+    log "已清理悬空镜像"
+  fi
+}
+
+# 清理本地旧镜像（保留最近2次）
+cleanup_old_local_images() {
+  log "正在清理本地旧镜像（保留最近 $KEEP_IMAGE_VERSIONS 次构建）..."
+
+  # 获取所有镜像标签，按构建时间戳排序
+  local all_images=$(docker images --filter "reference=$IMAGE_NAME" --format "{{.Tag}}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$' | sort -r)
+
+  if [ -z "$all_images" ]; then
+    log "没有找到需要清理的旧镜像"
+    return 0
+  fi
+
+  # 计算需要保留的镜像数量
+  local keep_count=$KEEP_IMAGE_VERSIONS
+  local total_images=$(echo "$all_images" | wc -l)
+
+  if [ $total_images -le $keep_count ]; then
+    log "当前只有 $total_images 个镜像，未超过保留限制 $keep_count 个，无需清理"
+    return 0
+  fi
+
+  log "发现 $total_images 个镜像，保留最新的 $keep_count 个"
+
+  # 获取需要删除的旧镜像（跳过前 $keep_count 个）
+  local images_to_delete=$(echo "$all_images" | tail -n +$((keep_count + 1)))
+
+  if [ -z "$images_to_delete" ]; then
+    log "没有需要删除的旧镜像"
+    return 0
+  fi
+
+  local deleted_count=0
+  while IFS= read -r image_tag; do
+    if [ -n "$image_tag" ]; then
+      log "删除旧镜像: $IMAGE_NAME:$image_tag"
+      if docker rmi "$IMAGE_NAME:$image_tag" 2>/dev/null; then
+        ((deleted_count++))
+      else
+        log_warning "无法删除镜像 $IMAGE_NAME:$image_tag，可能正在被使用"
+      fi
+    fi
+  done <<< "$images_to_delete"
+
+  log_success "已删除 $deleted_count 个旧镜像，保留了最新的 $keep_count 个镜像"
+
+  # 显示当前保留的镜像
+  local remaining_images=$(docker images --filter "reference=$IMAGE_NAME" --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}" | grep -E "$IMAGE_NAME:" | head -n $((keep_count + 1)))
+  if [ -n "$remaining_images" ]; then
+    log "当前保留的镜像:"
+    echo "$remaining_images"
+  fi
 }
 
 # 清理远程服务器的旧镜像
@@ -335,6 +474,8 @@ health_check() {
     if ssh $REMOTE_USER@$REMOTE_HOST "curl -f -s http://localhost:22345/health > /dev/null 2>&1"; then
       log_success "健康检查端点响应正常"
       health_checked=true
+    else
+      log_warning "健康检查端点响应失败，但继续检查其他方式"
     fi
 
     # 方式2: 检查基础连接
@@ -343,6 +484,8 @@ health_check() {
       if ssh $REMOTE_USER@$REMOTE_HOST "curl -f -s --connect-timeout 10 http://localhost:22345/ > /dev/null 2>&1"; then
         log_success "应用基础连接正常"
         health_checked=true
+      else
+        log_warning "基础连接检查失败，但继续检查日志"
       fi
     fi
 
@@ -353,13 +496,16 @@ health_check() {
       if [ -n "$recent_logs" ]; then
         log_warning "健康检查失败，但容器正在运行。最近日志:"
         echo "$recent_logs" | tail -10
-        # 检查日志中是否有错误
-        if echo "$recent_logs" | grep -i "error" > /dev/null; then
-          log_error "日志中发现错误信息"
+
+        # 检查日志中是否有关键错误（忽略认证相关的错误）
+        local critical_errors=$(echo "$recent_logs" | grep -i "error" | grep -v "access_token not found")
+        if [ -n "$critical_errors" ]; then
+          log_error "日志中发现关键错误信息:"
+          echo "$critical_errors"
           return 1
         else
-          log_warning "未在日志中发现明显错误，可能应用启动较慢"
-          return 0
+          log_warning "未在日志中发现关键错误，主要是认证问题，可能应用启动较慢或配置问题"
+          return 0  # 认证错误不算关键错误，返回成功
         fi
       else
         log_error "无法获取容器日志"
@@ -452,10 +598,28 @@ show_deploy_info() {
   log_success "应用名称: $PROJECT_NAME"
   log_success "版本升级: $CURRENT_VERSION → $NEXT_VERSION"
   log_success "构建标签: $NEW_VERSION"
+  log_success "构建时间: $BUILD_TIMESTAMP"
   log_success "服务地址: $REMOTE_HOST:$PORT_MAPPING"
   log_success "容器名称: $CONTAINER_NAME"
+  log_success "本地保留镜像: 最近 $KEEP_IMAGE_VERSIONS 次构建"
   log_success "部署时间: $(date)"
   log_success "=========================================="
+}
+
+# 显示部署警告信息
+show_deploy_warning() {
+  log_warning "=========================================="
+  log_warning "⚠️  Rust 服务部署完成，但有警告!"
+  log_warning "应用名称: $PROJECT_NAME"
+  log_warning "版本升级: $CURRENT_VERSION → $NEXT_VERSION"
+  log_warning "构建标签: $NEW_VERSION"
+  log_warning "构建时间: $BUILD_TIMESTAMP"
+  log_warning "服务地址: $REMOTE_HOST:$PORT_MAPPING"
+  log_warning "容器名称: $CONTAINER_NAME"
+  log_warning "状态: 容器已运行，但健康检查未完全通过"
+  log_warning "注意: 应用可能存在认证配置问题"
+  log_warning "部署时间: $(date)"
+  log_warning "=========================================="
 }
 
 # 主部署流程
@@ -472,12 +636,16 @@ main() {
   log "容器名称: $CONTAINER_NAME"
   log "本地打包文件: $LOCAL_TAR_FILE"
 
+  # 0.1 备份重要文件
+  backup_files
+
   # 1. 检查 Docker 环境
   check_docker_environment
 
   # 2. 更新版本号
   if ! update_version; then
     log_error "版本号更新失败"
+    restore_backup_files
     exit 1
   fi
 
@@ -487,56 +655,104 @@ main() {
   # 4. 运行测试（可选）
   run_tests
 
-  # 5. 使用 Docker 构建项目
+  # 5. 构建 Rust 项目
+  if ! build_rust_project; then
+    log_error "Rust 项目构建失败，正在回退版本..."
+    restore_backup_files
+    exit 1
+  fi
+
+  # 6. 使用 Docker 构建项目
   if ! build_with_docker; then
     log_error "Docker 构建失败，正在回退版本..."
-    revert_version
+    restore_backup_files
     exit 1
   fi
 
-  # 6. 保存 Docker 镜像
+  # 7. 保存 Docker 镜像
   if ! save_docker_image; then
     log_error "Docker 镜像保存失败，正在回退版本..."
-    revert_version
+    restore_backup_files
     cleanup
     exit 1
   fi
 
-  # 7. 上传到远程
+  # 8. 上传到远程
   if ! upload_to_remote; then
     log_error "文件上传失败，正在回退版本..."
-    revert_version
+    restore_backup_files
     cleanup
+    cleanup_local_images
     exit 1
   fi
 
-  # 8. 远程部署
+  # 9. 远程部署
   if ! remote_deploy; then
     log_error "远程部署失败，正在回退版本..."
-    revert_version
+    restore_backup_files
     cleanup
+    cleanup_local_images
     exit 1
   fi
 
-  # 9. 清理远程旧镜像
+  # 10. 清理远程旧镜像
   cleanup_remote_images
 
-  # 10. 健康检查
-  if health_check; then
+  # 11. 健康检查
+  local health_status=0
+  health_check || health_status=$?
+
+  if [ $health_status -eq 0 ]; then
     log_success "健康检查通过"
+    DEPLOYMENT_SUCCESS=true
   else
     log_warning "健康检查未完全通过，但部署已完成"
+    DEPLOYMENT_SUCCESS=true  # 仍然标记为成功，因为容器在运行
   fi
 
-  # 11. 清理资源
+  # 12. 清理本地旧镜像（保留最近2次）- 仅在部署成功时执行
+  # if [ "$DEPLOYMENT_SUCCESS" = true ]; then
+  #   cleanup_old_local_images
+  # fi
+
+  # 13. 清理资源
   cleanup
 
-  # 12. 提交版本更新到 Git（可选）
-  commit_version_update
+  # 14. 清理备份文件（部署成功后才清理备份）
+  if [ "$DEPLOYMENT_SUCCESS" = true ]; then
+    cleanup_backup_files
+  fi
 
-  # 13. 显示部署信息
-  show_deploy_info
+  # 15. 提交版本更新到 Git（可选）- 仅在部署成功时执行
+  if [ "$DEPLOYMENT_SUCCESS" = true ]; then
+    commit_version_update
+  fi
+
+  # 16. 显示部署信息
+  if [ "$DEPLOYMENT_SUCCESS" = true ]; then
+    if [ $health_status -eq 0 ]; then
+      show_deploy_info
+    else
+      show_deploy_warning
+    fi
+  else
+    log_error "部署失败"
+    exit 1
+  fi
 }
+
+# 错误处理
+handle_error() {
+  local exit_code=$?
+  log_error "部署过程发生错误，退出码: $exit_code"
+  restore_backup_files
+  cleanup
+  cleanup_local_images
+  exit $exit_code
+}
+
+# 设置错误处理
+trap handle_error ERR
 
 # 运行主函数
 main "$@"

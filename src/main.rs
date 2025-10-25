@@ -1,9 +1,8 @@
-use tokio::sync::Mutex;
-
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, http, web};
 use anyhow::{Context, Result};
-use server::{
+use tokio::sync::Mutex;
+use web_server::{
     SseNotifier,
     config::{init_logger, write_to_file},
     config_routes, create_db_pool, get_all_routes, init_route_registry,
@@ -38,9 +37,8 @@ async fn main() -> Result<()> {
     let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://127.0.0.1:5502")
-            .allowed_origin("http://127.0.0.1:12002")
+            .allowed_origin("https://blog.sunrise1024.top")
             .allowed_origin("http://localhost:12002")
-            // .allow_any_origin()
             .allowed_methods(vec![
                 http::Method::GET,
                 http::Method::POST,
