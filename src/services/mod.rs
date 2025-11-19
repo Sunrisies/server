@@ -8,4 +8,5 @@ pub mod sse;
 pub use sse::sse_stream;
 pub mod category;
 // pub use category::*;
+pub mod posts;
 pub mod upload;

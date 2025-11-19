@@ -1,7 +1,8 @@
 // src/models/responses.rs
 use crate::utils::fmt_beijing;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use validator::Validate;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct CategoryResponse {
@@ -61,4 +62,55 @@ pub struct PostResponse {
     pub size: i32,
     pub category: Option<CategoryResponse>,
     pub tags: Vec<TagResponse>,
+}
+
+/// 用于创建文章的请求体
+#[derive(Debug, Deserialize, ToSchema, Validate)]
+pub struct CreatePostRequest {
+    #[validate(length(min = 1, max = 255, message = "标题长度必须在1-255个字符之间"))]
+    pub title: String,
+
+    #[validate(length(max = 500, message = "摘要长度不能超过500个字符"))]
+    pub summary: Option<String>,
+
+    #[validate(length(min = 1, message = "内容不能为空"))]
+    pub content: String,
+
+    #[validate(length(min = 1, message = "Markdown内容不能为空"))]
+    pub markdowncontent: String,
+
+    pub cover_image: Option<String>,
+
+    pub category_id: i32,
+
+    #[validate(length(min = 1, message = "至少需要选择一个标签"))]
+    pub tag_ids: Vec<i32>,
+
+    pub status: i16, // 0 草稿 1 发布 2 下线
+
+    pub featured: bool,
+}
+
+/// 用于更新文章的请求体
+#[derive(Debug, Deserialize, ToSchema, Validate)]
+pub struct UpdatePostRequest {
+    #[validate(length(min = 1, max = 255, message = "标题长度必须在1-255个字符之间"))]
+    pub title: Option<String>,
+
+    #[validate(length(max = 500, message = "摘要长度不能超过500个字符"))]
+    pub summary: Option<String>,
+
+    pub content: Option<String>,
+
+    pub markdowncontent: Option<String>,
+
+    pub cover_image: Option<String>,
+
+    pub category_id: Option<i32>,
+
+    pub tag_ids: Option<Vec<i32>>,
+
+    pub status: Option<i16>, // 0 草稿 1 发布 2 下线
+
+    pub featured: Option<bool>,
 }
