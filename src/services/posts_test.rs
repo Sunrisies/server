@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::dto::posts::CreatePostRequest;
+    use crate::dto::posts::{CreatePostRequest, UpdatePostRequest};
     use crate::models::{categories, post_tags, posts, tags, users};
     use crate::services::posts::PostService;
     use sea_orm::{
@@ -282,6 +282,98 @@ mod tests {
         };
 
         tag.insert(db).await.expect("创建测试标签失败")
+    }
+
+    // 测试修改文章
+    #[tokio::test]
+    async fn test_update_post() {
+        // 初始化测试数据库连接
+        let db = setup_test_db().await;
+
+        // 创建测试用户
+        let user = create_test_user(&db).await;
+
+        // 创建测试分类
+        let category = create_test_category(&db).await;
+
+        // 创建测试标签
+        let tag1 = create_test_tag(&db, "Rust".to_string()).await;
+        let tag2 = create_test_tag(&db, "Web开发".to_string()).await;
+
+        // 先创建一篇文章
+        let create_post_request = CreatePostRequest {
+            title: "原始文章标题".to_string(),
+            summary: Some("这是原始文章的摘要".to_string()),
+            content: "这是原始文章的内容。".to_string(),
+            markdowncontent: "# 原始文章\n\n这是原始文章的内容。".to_string(),
+            cover_image: Some("https://example.com/original.jpg".to_string()),
+            category_id: category.id,
+            tag_ids: vec![tag1.id],
+            status: 1, // 发布状态
+            featured: false,
+        };
+
+        // 调用创建文章的服务方法
+        let result = PostService::create_post(&db, user.id, create_post_request).await;
+        assert!(result.is_ok(), "创建文章应该成功");
+        let original_post = result.unwrap();
+
+        // 创建新的标签用于更新
+        let tag3 = create_test_tag(&db, "更新".to_string()).await;
+        let new_category = create_test_category(&db).await;
+
+        // 构建更新文章的请求
+        let update_post_request = UpdatePostRequest {
+            title: Some("更新后的文章标题".to_string()),
+            summary: Some("这是更新后的文章摘要".to_string()),
+            content: Some("这是更新后的文章内容，比原来更长更详细。".to_string()),
+            markdowncontent: Some(
+                "# 更新后的文章\n\n这是更新后的文章内容，比原来更长更详细。".to_string(),
+            ),
+            cover_image: Some("https://example.com/updated.jpg".to_string()),
+            category_id: Some(new_category.id),
+            tag_ids: Some(vec![tag2.id, tag3.id]),
+            status: Some(1),      // 保持发布状态
+            featured: Some(true), // 设置为置顶
+        };
+
+        // 调用更新文章的服务方法
+        let update_result =
+            PostService::update_post(&db, user.id, &original_post.uuid, update_post_request).await;
+        assert!(update_result.is_ok(), "更新文章应该成功");
+        let updated_post = update_result.unwrap();
+
+        // 验证文章ID和UUID保持不变
+        assert_eq!(updated_post.id, original_post.id);
+        assert_eq!(updated_post.uuid, original_post.uuid);
+
+        // 验证文章基本信息已更新
+        assert_eq!(updated_post.title, "更新后的文章标题");
+        assert_eq!(updated_post.description, "这是更新后的文章摘要");
+        assert_eq!(updated_post.cover, "https://example.com/updated.jpg");
+        assert!(updated_post.is_top); // 现在是置顶文章
+        assert!(updated_post.is_publish); // 仍然是发布状态
+
+        // 验证更新时间已改变
+        assert!(updated_post.update_time > original_post.update_time);
+
+        // 验证分类已更新
+        assert!(updated_post.category.is_some());
+        let category_name = &updated_post.category.as_ref().unwrap().name;
+        assert!(category_name.starts_with("测试分类-"));
+        assert_ne!(
+            category_name,
+            &original_post.category.as_ref().unwrap().name
+        );
+
+        // 验证标签已更新
+        assert_eq!(updated_post.tags.len(), 2);
+        let tag_names: Vec<String> = updated_post.tags.iter().map(|t| t.name.clone()).collect();
+        assert!(tag_names.iter().any(|name| name.starts_with("Web开发-")));
+        assert!(tag_names.iter().any(|name| name.starts_with("更新-")));
+
+        // 清理测试数据
+        cleanup_test_data(&db, updated_post.id).await;
     }
 
     // 清理测试数据
