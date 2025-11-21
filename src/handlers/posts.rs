@@ -2,6 +2,7 @@ use crate::config::AppError;
 use crate::dto::PaginatedResp;
 use crate::dto::PaginationQuery;
 use crate::dto::common::Pagination;
+use crate::dto::posts::UpdatePostRequest;
 use crate::dto::posts::{
     CategoryResponse, CreatePostRequest, PostListResponse, PostResponse, TagResponse,
 };
@@ -321,35 +322,36 @@ pub async fn create_post_handler(
     }
 }
 
-// /// 更新文章处理器
-// pub async fn update_post_handler(
-//     db_pool: web::Data<DatabaseConnection>,
-//     path: web::Path<String>,
-//     post_data: web::Json<UpdatePostRequest>,
-//     // 从认证中间件获取用户ID
-//     user_id: web::ReqData<i32>,
-// ) -> HttpResult {
-//     // 验证输入
-//     if let Err(validation_errors) = post_data.validate() {
-//         let msg = ValidationErrorJson::from_validation_errors(&validation_errors);
-//         return Ok(ApiResponse::from(AppError::ValidationError(msg)).to_http_response());
-//     }
+/// 更新文章处理器
+pub async fn update_post_handler(
+    db_pool: web::Data<DatabaseConnection>,
+    path: web::Path<String>,
+    post_data: web::Json<UpdatePostRequest>,
+    // 从认证中间件获取用户ID
+    // user_id: web::ReqData<i32>,
+) -> HttpResult {
+    let user_id = 1;
+    // 验证输入
+    if let Err(validation_errors) = post_data.validate() {
+        let msg = ValidationErrorJson::from_validation_errors(&validation_errors);
+        return Ok(ApiResponse::from(AppError::ValidationError(msg)).to_http_response());
+    }
 
-//     let uuid = path.into_inner();
+    let uuid = path.into_inner();
 
-//     // 调用服务层更新文章
-//     match crate::services::posts::PostService::update_post(
-//         db_pool.as_ref(),
-//         *user_id,
-//         &uuid,
-//         post_data.into_inner(),
-//     )
-//     .await
-//     {
-//         Ok(post) => Ok(ApiResponse::success(post, "文章更新成功").to_http_response()),
-//         Err(e) => Ok(ApiResponse::from(e).to_http_response()),
-//     }
-// }
+    // 调用服务层更新文章
+    match crate::services::posts::PostService::update_post(
+        db_pool.as_ref(),
+        user_id,
+        &uuid,
+        post_data.into_inner(),
+    )
+    .await
+    {
+        Ok(post) => Ok(ApiResponse::success(post, "文章更新成功").to_http_response()),
+        Err(e) => Ok(ApiResponse::from(e).to_http_response()),
+    }
+}
 
 // /// 删除文章处理器
 // pub async fn delete_post_handler(
