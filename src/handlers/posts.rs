@@ -353,19 +353,19 @@ pub async fn update_post_handler(
     }
 }
 
-// /// 删除文章处理器
-// pub async fn delete_post_handler(
-//     db_pool: web::Data<DatabaseConnection>,
-//     path: web::Path<String>,
-//     // 从认证中间件获取用户ID
-//     user_id: web::ReqData<i32>,
-// ) -> HttpResult {
-//     let uuid = path.into_inner();
+/// 删除文章处理器
+pub async fn delete_post_handler(
+    db_pool: web::Data<DatabaseConnection>,
+    path: web::Path<String>,
+    // 从认证中间件获取用户ID
+    // user_id: web::ReqData<i32>,
+) -> HttpResult {
+    let user_id = 1;
+    let uuid = path.into_inner();
 
-//     // 调用服务层删除文章
-//     match crate::services::posts::PostService::delete_post(db_pool.as_ref(), *user_id, &uuid).await
-//     {
-//         Ok(()) => Ok(ApiResponse::success((), "文章删除成功").to_http_response()),
-//         Err(e) => Ok(ApiResponse::from(e).to_http_response()),
-//     }
-// }
+    // 调用服务层删除文章
+    match crate::services::posts::PostService::delete_post(db_pool.as_ref(), user_id, &uuid).await {
+        Ok(()) => Ok(ApiResponse::success((), "文章删除成功").to_http_response()),
+        Err(e) => Ok(ApiResponse::from(e).to_http_response()),
+    }
+}

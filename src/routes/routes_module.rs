@@ -8,13 +8,8 @@ use crate::{
             create_categories_handler, get_categories_all_handler, get_categories_handler,
         },
         posts::{
-            create_post_handler,
-            get_posts_all_handler,
-            get_posts_handler,
-            get_prev_next_handler,
-            get_timeline_handler,
-            update_post_handler,
-            // delete_post_handler,
+            create_post_handler, delete_post_handler, get_posts_all_handler, get_posts_handler,
+            get_prev_next_handler, get_timeline_handler, update_post_handler,
         },
         register,
         room_messages::get_room_messages_handler,
@@ -68,7 +63,8 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                     .route("", web::get().to(get_posts_all_handler))
                     .route("", web::post().to(create_post_handler))
                     .route("/{uuid:.*}", web::get().to(get_posts_handler))
-                    .route("/{uuid:.*}", web::put().to(update_post_handler)), // .route("/{uuid:.*}", web::delete().to(delete_post_handler)),
+                    .route("/{uuid:.*}", web::put().to(update_post_handler))
+                    .route("/{uuid:.*}", web::delete().to(delete_post_handler)),
             )
             .service(
                 web::scope("/v1/rooms")

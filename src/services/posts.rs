@@ -313,58 +313,58 @@ impl PostService {
         })
     }
 
-    // /// 删除文章
-    // pub async fn delete_post(
-    //     db: &DatabaseConnection,
-    //     user_id: i32,
-    //     uuid: &str,
-    // ) -> Result<(), AppError> {
-    //     // 查询文章是否存在
-    //     let post = posts::Entity::find_by_uuid(uuid)
-    //         .one(db)
-    //         .await
-    //         .map_err(|e| {
-    //             log::error!("查询文章失败: {}", e);
-    //             AppError::DatabaseError("服务器内部错误".to_string())
-    //         })?
-    //         .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
+    /// 删除文章
+    pub async fn delete_post(
+        db: &DatabaseConnection,
+        user_id: i32,
+        uuid: &str,
+    ) -> Result<(), AppError> {
+        // 查询文章是否存在
+        let post = posts::Entity::find_by_uuid(uuid)
+            .one(db)
+            .await
+            .map_err(|e| {
+                log::error!("查询文章失败: {}", e);
+                AppError::DatabaseError("服务器内部错误".to_string())
+            })?
+            .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
 
-    //     // 检查权限（只有作者可以删除自己的文章）
-    //     if post.author_id != user_id {
-    //         return Err(AppError::Unauthorized("没有权限删除此文章".to_string()));
-    //     }
+        // 检查权限（只有作者可以删除自己的文章）
+        if post.author_id != user_id {
+            return Err(AppError::Unauthorized("没有权限删除此文章".to_string()));
+        }
 
-    //     // 开启事务
-    //     let txn = db.begin().await.map_err(|e| {
-    //         log::error!("开启事务失败: {}", e);
-    //         AppError::DatabaseError("服务器内部错误".to_string())
-    //     })?;
+        // 开启事务
+        let txn = db.begin().await.map_err(|e| {
+            log::error!("开启事务失败: {}", e);
+            AppError::DatabaseError("服务器内部错误".to_string())
+        })?;
 
-    //     // 删除文章标签关联
-    //     post_tags::Entity::delete_many()
-    //         .filter(post_tags::Column::PostId.eq(post.id))
-    //         .exec(&txn)
-    //         .await
-    //         .map_err(|e| {
-    //             log::error!("删除文章标签关联失败: {}", e);
-    //             AppError::DatabaseError("删除文章失败".to_string())
-    //         })?;
+        // 删除文章标签关联
+        post_tags::Entity::delete_many()
+            .filter(post_tags::Column::PostId.eq(post.id))
+            .exec(&txn)
+            .await
+            .map_err(|e| {
+                log::error!("删除文章标签关联失败: {}", e);
+                AppError::DatabaseError("删除文章失败".to_string())
+            })?;
 
-    //     // 删除文章
-    //     posts::Entity::delete_by_id(post.id)
-    //         .exec(&txn)
-    //         .await
-    //         .map_err(|e| {
-    //             log::error!("删除文章失败: {}", e);
-    //             AppError::DatabaseError("删除文章失败".to_string())
-    //         })?;
+        // 删除文章
+        posts::Entity::delete_by_id(post.id)
+            .exec(&txn)
+            .await
+            .map_err(|e| {
+                log::error!("删除文章失败: {}", e);
+                AppError::DatabaseError("删除文章失败".to_string())
+            })?;
 
-    //     // 提交事务
-    //     txn.commit().await.map_err(|e| {
-    //         log::error!("提交事务失败: {}", e);
-    //         AppError::DatabaseError("服务器内部错误".to_string())
-    //     })?;
+        // 提交事务
+        txn.commit().await.map_err(|e| {
+            log::error!("提交事务失败: {}", e);
+            AppError::DatabaseError("服务器内部错误".to_string())
+        })?;
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
