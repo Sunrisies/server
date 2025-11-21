@@ -9,4 +9,6 @@ pub use sse::sse_stream;
 pub mod category;
 // pub use category::*;
 pub mod posts;
+#[cfg(test)]
+mod posts_test;
 pub mod upload;
