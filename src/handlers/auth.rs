@@ -1,8 +1,8 @@
-use crate::RouteInfo;
 use crate::config::AppError;
 use crate::dto::user::{LoginRequest, ValidationErrorJson};
 use crate::{ApiResponse, HttpResult, SseNotifier};
 use crate::{AuthService, RegisterResponse};
+use crate::{EmailVerificationManager, RouteInfo};
 use actix_web::web;
 use route_macros::route_permission;
 use sea_orm::DatabaseConnection;
@@ -50,6 +50,7 @@ pub async fn register(
 pub async fn login(
     db_pool: web::Data<DatabaseConnection>,
     login: web::Json<LoginRequest>,
+    email_manager: web::Data<EmailVerificationManager>, // 添加这行
 ) -> HttpResult {
     if let Err(e) = login.validate() {
         let msg = ValidationErrorJson::from_validation_errors(&e);
@@ -57,7 +58,7 @@ pub async fn login(
     }
     match login.0 {
         LoginRequest::Password(p) => AuthService::login_by_pwd(db_pool, p).await,
-        LoginRequest::Email(e) => AuthService::login_by_email(db_pool, e).await,
+        LoginRequest::Email(e) => AuthService::login_by_email(db_pool, e, email_manager).await,
         LoginRequest::Phone(p) => AuthService::login_by_phone(db_pool, p).await,
         LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o).await,
     }

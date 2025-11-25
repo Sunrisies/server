@@ -4,9 +4,10 @@ use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use web_server::{
     SseNotifier,
-    config::{init_logger, write_to_file},
+    config::{EMAIL_CONFIG, init_logger, write_to_file},
     config_routes, create_db_pool, get_all_routes, init_route_registry,
     middleware::auth::Auth,
+    services::{EmailService, EmailVerificationManager},
     utils::{perm_cache::load_perm_cache, websocket::ChatServer},
 };
 
@@ -31,6 +32,23 @@ async fn main() -> Result<()> {
     // 添加sse
     let notifier = web::Data::new(SseNotifier::new());
     let chat_server = web::Data::new(Mutex::new(ChatServer::new()));
+
+    // 初始化邮件服务
+    let email_service = web::Data::new(EmailService::new(
+        EMAIL_CONFIG.smtp_server.clone(),
+        EMAIL_CONFIG.smtp_port,
+        EMAIL_CONFIG.from_email.clone(),
+        EMAIL_CONFIG.from_password.clone(),
+        EMAIL_CONFIG.code_validity_period,
+    ));
+
+    // 初始化邮件验证码管理器
+    let email_verification_manager = web::Data::new(EmailVerificationManager::new(
+        EMAIL_CONFIG.code_validity_period,
+    ));
+
+    // 启动邮件验证码清理任务
+    email_verification_manager.start_cleanup_task();
 
     write_to_file(); // api_doc生成文件
     println!("Server running on http://127.0.0.1:2345");
@@ -57,6 +75,8 @@ async fn main() -> Result<()> {
             .app_data(db_pool.clone())
             .app_data(notifier.clone())
             .app_data(chat_server.clone()) // 共享聊天服务器状态
+            .app_data(email_service.clone()) // 添加邮件服务
+            .app_data(email_verification_manager.clone()) // 添加邮件验证码管理器
             .configure(config_routes)
             .wrap(actix_web::middleware::Logger::default())
             .wrap(cors)

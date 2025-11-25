@@ -4,7 +4,7 @@ use crate::models::users::ActiveModel;
 use crate::models::{roles, user_roles};
 use crate::utils::crypto_pwd::{hash, verify};
 use crate::utils::jwt::generate_jwt;
-use crate::{ApiResponse, SseNotifier};
+use crate::{ApiResponse, EmailVerificationManager, SseNotifier};
 use crate::{HttpResult, RegisterResponse};
 use actix_web::cookie::{Cookie, SameSite, time::Duration as ActixDuration};
 use actix_web::{HttpResponse, web};
@@ -146,12 +146,65 @@ impl AuthService {
     }
 
     pub async fn login_by_email(
-        _db_pool: web::Data<DatabaseConnection>,
+        db_pool: web::Data<DatabaseConnection>,
         email: EmailLogin,
+        // email_service: web::Data<EmailService>,
+        email_verification_manager: web::Data<EmailVerificationManager>,
     ) -> HttpResult {
         log::info!("login_by_email{:?}", email);
 
-        Ok(ApiResponse::success("user", "邮箱").to_http_response())
+        // 验证验证码
+        let is_valid = email_verification_manager
+            .verify_code(&email.email, &email.code)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("验证验证码失败: {}", e)))?;
+
+        if !is_valid {
+            return Err(AppError::BadRequest("验证码无效或已过期".to_string()));
+        }
+
+        // 查找用户
+        let user = match crate::models::users::Entity::find()
+            .filter(crate::models::users::Column::Email.eq(&email.email))
+            .one(db_pool.as_ref())
+            .await
+        {
+            Ok(user) => user,
+            Err(e) => return Err(AppError::DatabaseError(e.to_string())),
+        };
+
+        if user.is_none() {
+            return Err(AppError::NotFound("用户不存在".to_string()));
+        }
+        let user = user.unwrap();
+
+        // 生成JWT令牌
+        let token = generate_jwt(
+            &db_pool,
+            &user,
+            "uZr0aHV8Z2dRa1NmYnJ0aXN0aGViZXN0a2V5",
+            3600,
+        )
+        .await?;
+
+        log::info!("login_by_email token: {:?}", token);
+
+        // 构造Cookie
+        let cookie = Cookie::build("access_token", token)
+            .http_only(true) // 防XSS
+            .same_site(SameSite::Strict) // 防CSRF
+            .secure(true) // 生产必须true，本地可false
+            .max_age(ActixDuration::hours(1))
+            .path("/") // 全局可用
+            .finish();
+
+        Ok(HttpResponse::Ok()
+            .cookie(cookie) // 把Cookie塞进响应
+            .json(json!({
+                "code": 200,
+                "message": "邮箱登录成功",
+                "data": user
+            })))
     }
     pub async fn login_by_phone(
         _db_pool: web::Data<DatabaseConnection>,

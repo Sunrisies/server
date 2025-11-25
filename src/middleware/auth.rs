@@ -63,6 +63,7 @@ where
             "/api/v1/categories",
             "/api/v1/rooms",
             "/api/v1/upload",
+            "/api/email",
         ];
         let is_public = exact_paths.contains(&path.as_str())
             || prefix_paths.iter().any(|&prefix| path.starts_with(prefix));

@@ -14,6 +14,7 @@ use crate::{
         register,
         room_messages::get_room_messages_handler,
         rooms::{create_room_handler, get_room_handler},
+        send_verification_code,
         tags::{
             get_posts_by_tag_handler, get_tags_with_count_handler,
             tags_routes::{create_tags_handler, delete_tags_handler, get_tags_all_handler},
@@ -76,6 +77,10 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
                         web::get().to(get_room_messages_handler),
                     ),
             )
-            .service(web::scope("/v1/upload").route("", web::post().to(upload_file_handler))),
+            .service(web::scope("/v1/upload").route("", web::post().to(upload_file_handler)))
+            .service(web::scope("/v1/email").route(
+                "/send-verification-code",
+                web::get().to(send_verification_code),
+            )),
     );
 }
