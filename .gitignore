@@ -7,3 +7,4 @@ change-commit-date.sh
 /logs
 openapi.json
 git_purge_file.sh
+.codebuddy/

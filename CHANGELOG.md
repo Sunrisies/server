@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file. See [conven
 ---
 ## [unreleased]
 
+### Documentation
+
+- **architecture**: 完善项目架构文档和图表 - (2025-12-02)
+  - 更新 `architecture_diagram.md` 添加详细的Mermaid架构图
+    - 系统整体架构图
+    - 核心模块关系图
+    - 数据库ER图
+    - API架构图
+    - 中间件处理流程图
+    - 请求处理生命周期图
+    - 权限系统架构图
+    - 文件上传流程图
+    - WebSocket聊天架构图
+    - 数据库连接池管理图
+  - 重写 `arch.md` 提供完整的架构文档
+    - 详细的项目结构说明
+    - 各层职责和依赖关系
+    - 核心功能模块详解
+    - 认证授权系统说明
+    - 数据流和权限验证流程
+    - 关键配置说明
+    - 安全措施和性能优化
+    - 错误处理和日志系统
+    - API文档和部署指南
+  - 完全重写 `README.md` 使其更专业和全面
+    - 添加技术栈徽章
+    - 详细的功能特性列表
+    - 完整的快速开始指南
+    - 清晰的项目结构说明
+    - API端点文档
+    - 配置说明和开发指南
+    - 部署和测试说明
+  - 新增 `ARCHITECTURE_OVERVIEW.md` 架构总览文档
+    - 系统概览和核心架构层次
+    - 典型请求流程说明
+    - 认证授权系统详解
+    - 数据库设计要点
+    - API设计原则
+    - 性能优化策略
+    - 安全措施说明
+    - 学习资源链接
+
 ### Miscellaneous Chores
 
 - initialize basic structure for the repo - ([2436bec](https://github.com/tyrchen/qdrant-lib/commit/2436bec4a02caac64f6c1f97ca79b6ce745b4f53)) - Tyr Chen
