@@ -1,2 +1,10 @@
+pub mod auth;
+pub mod categories;
+pub mod email;
+pub mod posts;
+pub mod rooms;
 mod routes_module;
+pub mod tags;
+pub mod upload;
+pub mod users;
 pub use routes_module::config_routes;
