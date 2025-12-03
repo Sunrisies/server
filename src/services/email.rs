@@ -5,6 +5,8 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+use crate::config::manager::CONFIG;
+
 /// 邮件服务
 pub struct EmailService {
     /// SMTP服务器地址
@@ -18,25 +20,18 @@ pub struct EmailService {
     /// 验证码有效期（秒）
     code_validity_period: u64,
 }
-
-impl EmailService {
-    /// 创建新的邮件服务实例
-    pub fn new(
-        smtp_server: String,
-        smtp_port: u16,
-        from_email: String,
-        from_password: String,
-        code_validity_period: u64,
-    ) -> Self {
+impl Default for EmailService {
+    fn default() -> Self {
         Self {
-            smtp_server,
-            smtp_port,
-            from_email,
-            from_password,
-            code_validity_period,
+            smtp_server: CONFIG.smtp.smtp_server.clone(),
+            smtp_port: CONFIG.smtp.smtp_port,
+            from_email: CONFIG.smtp.from_email.clone(),
+            from_password: CONFIG.smtp.from_password.clone(),
+            code_validity_period: CONFIG.smtp.code_validity_period,
         }
     }
-
+}
+impl EmailService {
     /// 生成6位随机验证码
     pub fn generate_verification_code() -> String {
         let mut rng = rand::thread_rng();
@@ -294,13 +289,17 @@ pub struct EmailVerificationManager {
     /// 验证码有效期（秒）
     validity_period: u64,
 }
-
+impl Default for EmailVerificationManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl EmailVerificationManager {
     /// 创建新的验证码管理器
-    pub fn new(validity_period: u64) -> Self {
+    pub fn new() -> Self {
         Self {
             codes: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
-            validity_period,
+            validity_period: CONFIG.smtp.code_validity_period,
         }
     }
 

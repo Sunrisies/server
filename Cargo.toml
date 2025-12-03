@@ -50,6 +50,7 @@ image = { version = "0.25.8", default-features = false, features = [
     "webp",
 ] }
 qiniu-upload-manager = "0.2.4"
+config = "0.15.19"
 
 
 [profile.dev]

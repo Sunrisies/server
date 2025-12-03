@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use web_server::{
     SseNotifier,
-    config::{EMAIL_CONFIG, init_logger, write_to_file},
+    config::{init_logger, manager::CONFIG, write_to_file},
     config_routes, create_db_pool, get_all_routes, init_route_registry,
     middleware::auth::Auth,
     services::{EmailService, EmailVerificationManager},
@@ -14,6 +14,8 @@ use web_server::{
 #[actix_web::main]
 async fn main() -> Result<()> {
     init_logger(); // 初始化日志
+    // let app_config = AppConfig::default();
+    log::info!("app config: {:?}", CONFIG.database);
     // 初始化路由注册表 - 这行很重要！
     init_route_registry();
 
@@ -34,24 +36,19 @@ async fn main() -> Result<()> {
     let chat_server = web::Data::new(Mutex::new(ChatServer::new()));
 
     // 初始化邮件服务
-    let email_service = web::Data::new(EmailService::new(
-        EMAIL_CONFIG.smtp_server.clone(),
-        EMAIL_CONFIG.smtp_port,
-        EMAIL_CONFIG.from_email.clone(),
-        EMAIL_CONFIG.from_password.clone(),
-        EMAIL_CONFIG.code_validity_period,
-    ));
+    let email_service = web::Data::new(EmailService::default());
 
-    // 初始化邮件验证码管理器
-    let email_verification_manager = web::Data::new(EmailVerificationManager::new(
-        EMAIL_CONFIG.code_validity_period,
-    ));
+    // // 初始化邮件验证码管理器
+    let email_verification_manager = web::Data::new(EmailVerificationManager::default());
 
-    // 启动邮件验证码清理任务
+    // // 启动邮件验证码清理任务
     email_verification_manager.start_cleanup_task();
 
     write_to_file(); // api_doc生成文件
-    println!("Server running on http://127.0.0.1:2345");
+    println!(
+        "Server running on {}:{}",
+        CONFIG.server.host, CONFIG.server.port
+    );
     let server = HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin("http://127.0.0.1:5502")
@@ -84,7 +81,7 @@ async fn main() -> Result<()> {
     });
 
     server
-        .bind(("0.0.0.0", 2345))?
+        .bind((CONFIG.server.host.as_str(), CONFIG.server.port))?
         .on_connect(move |conn, _addr| {
             println!("New connection: {:?}", conn);
             println!("Remote address: {:?}", _addr);
