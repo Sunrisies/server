@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 use web_server::{
     SseNotifier,
     config::{init_logger, manager::CONFIG, write_to_file},
-    config_routes, create_db_pool, get_all_routes, init_route_registry,
+    config_routes, create_db_pool, init_route_registry,
     middleware::auth::Auth,
     services::{EmailService, EmailVerificationManager},
     utils::{perm_cache::load_perm_cache, websocket::ChatServer},
@@ -20,11 +20,11 @@ async fn main() -> Result<()> {
     init_route_registry();
 
     // 打印所有注册的路由（调试用）
-    let routes = get_all_routes();
-    log::info!("Registered {} routes:", routes.len());
-    for route in routes {
-        log::info!("  {} {} -> {}", route.method, route.path, route.permission);
-    }
+    // let routes = get_all_routes();
+    // log::info!("Registered {} routes:", routes.len());
+    // for route in routes {
+    //     log::info!("  {} {} -> {}", route.method, route.path, route.permission);
+    // }
     let db = create_db_pool()
         .await
         .context("Failed to connect to database")?;
@@ -89,12 +89,4 @@ async fn main() -> Result<()> {
         .run()
         .await?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }
