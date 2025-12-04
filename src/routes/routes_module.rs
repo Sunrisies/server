@@ -4,7 +4,7 @@ use crate::routes::{auth, categories, email, posts, rooms, tags, upload, users};
 
 pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/api/v1")
+        web::scope("/api")
             // 认证路由
             .configure(auth::config_routes)
             // 用户路由

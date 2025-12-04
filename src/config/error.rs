@@ -1,8 +1,8 @@
-use actix_web::{HttpResponse, ResponseError};
+use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use serde::Serialize;
 use std::fmt;
 
-use crate::dto::user::ValidationErrorJson;
+use crate::{ApiResponse, dto::user::ValidationErrorJson};
 
 #[derive(Debug, Serialize)]
 pub enum AppError {
@@ -50,34 +50,80 @@ pub enum AppError {
     MaintenanceMode(String),
 }
 
-// 字段级错误详情
-#[derive(Debug, Serialize)]
-pub struct FieldError {
-    pub field: String,
-    pub message: String,
-    pub code: String,
-}
-
 impl AppError {
-    // 便捷构造函数
-    pub fn unauthorized(message: &str) -> Self {
-        AppError::Unauthorized(message.to_string())
+    // 获取错误码
+    pub fn code(&self) -> &'static str {
+        match self {
+            AppError::Unauthorized(_) => "UNAUTHORIZED",
+            AppError::Forbidden(_) => "FORBIDDEN",
+            AppError::InvalidCredentials(_) => "INVALID_CREDENTIALS",
+            AppError::TokenExpired(_) => "TOKEN_EXPIRED",
+            AppError::TokenInvalid(_) => "TOKEN_INVALID",
+            AppError::BadRequest(_) => "BAD_REQUEST",
+            AppError::ValidationError(_) => "VALIDATION_ERROR",
+            AppError::UnprocessableEntity(_) => "UNPROCESSABLE_ENTITY",
+            AppError::NotFound(_) => "NOT_FOUND",
+            AppError::AlreadyExists(_) => "ALREADY_EXISTS",
+            AppError::Conflict(_) => "CONFLICT",
+            AppError::RateLimited(_) => "RATE_LIMITED",
+            AppError::FileTooLarge(_) => "FILE_TOO_LARGE",
+            AppError::UnsupportedFileType(_) => "UNSUPPORTED_FILE_TYPE",
+            AppError::UploadFailed(_) => "UPLOAD_FAILED",
+            AppError::DatabaseError(_) => "DATABASE_ERROR",
+            AppError::DatabaseTimeout(_) => "DATABASE_TIMEOUT",
+            AppError::DatabaseConnectionError(_) => "DATABASE_CONNECTION_ERROR",
+            AppError::ExternalServiceError(_) => "EXTERNAL_SERVICE_ERROR",
+            AppError::EmailServiceError(_) => "EMAIL_SERVICE_ERROR",
+            AppError::SearchServiceError(_) => "SEARCH_SERVICE_ERROR",
+            AppError::StorageServiceError(_) => "STORAGE_SERVICE_ERROR",
+            AppError::InternalServerError(_) => "INTERNAL_SERVER_ERROR",
+            AppError::ConfigurationError(_) => "CONFIGURATION_ERROR",
+            AppError::EncryptionError(_) => "ENCRYPTION_ERROR",
+            AppError::NotImplemented(_) => "NOT_IMPLEMENTED",
+            AppError::MaintenanceMode(_) => "MAINTENANCE_MODE",
+        }
     }
 
-    pub fn not_found(resource: &str) -> Self {
-        AppError::NotFound(format!("{} 未找到", resource))
+    // 获取 HTTP 状态码
+    pub fn status_code(&self) -> StatusCode {
+        match self {
+            AppError::Unauthorized(_)
+            | AppError::InvalidCredentials(_)
+            | AppError::TokenExpired(_)
+            | AppError::TokenInvalid(_) => StatusCode::UNAUTHORIZED,
+            AppError::Forbidden(_) => StatusCode::FORBIDDEN,
+            AppError::BadRequest(_) | AppError::ValidationError(_) | AppError::UploadFailed(_) => {
+                StatusCode::BAD_REQUEST
+            }
+            AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::NotFound(_) => StatusCode::NOT_FOUND,
+            AppError::AlreadyExists(_) | AppError::Conflict(_) => StatusCode::CONFLICT,
+            AppError::RateLimited(_) => StatusCode::TOO_MANY_REQUESTS,
+            AppError::FileTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+            AppError::UnsupportedFileType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            AppError::DatabaseError(_)
+            | AppError::DatabaseTimeout(_)
+            | AppError::DatabaseConnectionError(_)
+            | AppError::ExternalServiceError(_)
+            | AppError::EmailServiceError(_)
+            | AppError::SearchServiceError(_)
+            | AppError::StorageServiceError(_)
+            | AppError::InternalServerError(_)
+            | AppError::ConfigurationError(_)
+            | AppError::EncryptionError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
+            AppError::MaintenanceMode(_) => StatusCode::SERVICE_UNAVAILABLE,
+        }
     }
 
-    // pub fn validation(field: &str, message: &str, code: &str) -> Self {
-    //     AppError::ValidationError(vec![FieldError {
-    //         field: field.to_string(),
-    //         message: message.to_string(),
-    //         code: code.to_string(),
-    //     }])
-    // }
-
-    pub fn already_exists(resource: &str) -> Self {
-        AppError::AlreadyExists(format!("{} 已存在", resource))
+    // 获取错误详情
+    pub fn details(&self) -> Option<serde_json::Value> {
+        match self {
+            AppError::ValidationError(field_errors) => {
+                Some(serde_json::to_value(field_errors).unwrap())
+            }
+            _ => None,
+        }
     }
 }
 
@@ -122,39 +168,11 @@ impl fmt::Display for AppError {
 // 实现 ResponseError trait 用于 Actix-web 错误处理
 impl ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
-        match self {
-            // 4xx 错误
-            AppError::Unauthorized(_) => HttpResponse::Unauthorized().json(self),
-            AppError::Forbidden(_) => HttpResponse::Forbidden().json(self),
-            AppError::InvalidCredentials(_) => HttpResponse::Unauthorized().json(self),
-            AppError::TokenExpired(_) => HttpResponse::Unauthorized().json(self),
-            AppError::TokenInvalid(_) => HttpResponse::Unauthorized().json(self),
-            AppError::BadRequest(_) => HttpResponse::BadRequest().json(self),
-            AppError::ValidationError(_) => HttpResponse::BadRequest().json(self),
-            AppError::UnprocessableEntity(_) => HttpResponse::UnprocessableEntity().json(self),
-            AppError::NotFound(_) => HttpResponse::NotFound().json(self),
-            AppError::AlreadyExists(_) => HttpResponse::Conflict().json(self),
-            AppError::Conflict(_) => HttpResponse::Conflict().json(self),
-            AppError::RateLimited(_) => HttpResponse::TooManyRequests().json(self),
-            AppError::FileTooLarge(_) => HttpResponse::PayloadTooLarge().json(self),
-            AppError::UnsupportedFileType(_) => HttpResponse::UnsupportedMediaType().json(self),
-            AppError::UploadFailed(_) => HttpResponse::BadRequest().json(self),
-
-            // 5xx 错误
-            AppError::DatabaseError(_)
-            | AppError::DatabaseTimeout(_)
-            | AppError::DatabaseConnectionError(_)
-            | AppError::ExternalServiceError(_)
-            | AppError::EmailServiceError(_)
-            | AppError::SearchServiceError(_)
-            | AppError::StorageServiceError(_)
-            | AppError::InternalServerError(_)
-            | AppError::ConfigurationError(_)
-            | AppError::EncryptionError(_) => HttpResponse::InternalServerError().json(self),
-
-            AppError::NotImplemented(_) => HttpResponse::NotImplemented().json(self),
-            AppError::MaintenanceMode(_) => HttpResponse::ServiceUnavailable().json(self),
-        }
+        HttpResponse::build(self.status_code()).json(ApiResponse::<()> {
+            code: self.status_code().as_u16() as i32,
+            message: self.to_string(),
+            data: None,
+        })
     }
 }
 

@@ -11,11 +11,11 @@ where
     T: Serialize,
 {
     /// 状态码
-    code: i32,
+    pub code: i32,
     /// 消息
-    message: String,
+    pub message: String,
     /// 数据
-    data: Option<T>,
+    pub data: Option<T>,
 }
 
 impl<T: Serialize> ApiResponse<T> {

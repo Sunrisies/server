@@ -1,5 +1,9 @@
 use actix_cors::Cors;
-use actix_web::{App, HttpServer, http, web};
+use actix_web::{
+    App, HttpServer,
+    http::{self},
+    web,
+};
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use web_server::{
@@ -15,7 +19,7 @@ use web_server::{
 async fn main() -> Result<()> {
     init_logger(); // 初始化日志
     // let app_config = AppConfig::default();
-    log::info!("app config: {:?}", CONFIG.database);
+    log::info!("app config: {:#?}", CONFIG.jwt);
     // 初始化路由注册表 - 这行很重要！
     init_route_registry();
 
@@ -69,6 +73,7 @@ async fn main() -> Result<()> {
             .supports_credentials()
             .max_age(3600);
         App::new()
+            .wrap(Auth)
             .app_data(db_pool.clone())
             .app_data(notifier.clone())
             .app_data(chat_server.clone()) // 共享聊天服务器状态
@@ -77,7 +82,6 @@ async fn main() -> Result<()> {
             .configure(config_routes)
             .wrap(actix_web::middleware::Logger::default())
             .wrap(cors)
-            .wrap(Auth)
     });
 
     server

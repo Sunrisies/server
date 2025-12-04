@@ -68,7 +68,7 @@ pub struct DatabaseSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JwtSettings {
     pub secret: String,
-    pub expiry: u64,
+    pub expiry: i64,
 }
 
 // 其他设置结构...
@@ -118,7 +118,7 @@ impl Default for AppConfig {
             },
             jwt: JwtSettings {
                 secret: env::var("JWT_SECRET").unwrap_or_else(|_| "your_secret_key".to_string()),
-                expiry: env::var("JWT_EXPIRY")
+                expiry: env::var("JWT_EXPIRATION")
                     .unwrap_or_else(|_| "86400".to_string())
                     .parse()
                     .unwrap(),

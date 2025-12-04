@@ -110,13 +110,7 @@ impl AuthService {
         match verify(&login.password, user.pass_word.as_str()) {
             Ok(true) => {
                 // 登录成功
-                let token = generate_jwt(
-                    &db_pool,
-                    &user,
-                    "uZr0aHV8Z2dRa1NmYnJ0aXN0aGViZXN0a2V5",
-                    3600,
-                )
-                .await?;
+                let token = generate_jwt(&db_pool, &user).await?;
                 log::info!("login_by_pwd token: {:?}", token);
                 // 2. 构造 Cookie
                 let cookie = Cookie::build("access_token", token)
@@ -179,13 +173,7 @@ impl AuthService {
         let user = user.unwrap();
 
         // 生成JWT令牌
-        let token = generate_jwt(
-            &db_pool,
-            &user,
-            "uZr0aHV8Z2dRa1NmYnJ0aXN0aGViZXN0a2V5",
-            3600,
-        )
-        .await?;
+        let token = generate_jwt(&db_pool, &user).await?;
 
         log::info!("login_by_email token: {:?}", token);
 

@@ -86,10 +86,7 @@ where
                     let token = cookie.value();
 
                     // 验证令牌
-                    match crate::utils::jwt::decode_jwt(
-                        token,
-                        "uZr0aHV8Z2dRa1NmYnJ0aXN0aGViZXN0a2V5",
-                    ) {
+                    match crate::utils::jwt::decode_jwt(token) {
                         Ok(claims) => {
                             log::info!("s: {:?}", claims);
                             // 令牌有效，调用服务

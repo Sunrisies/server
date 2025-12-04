@@ -1,3 +1,4 @@
+use crate::config::manager::CONFIG;
 use crate::models::roles::{self};
 use crate::models::user_roles;
 use crate::{config::AppError, models::users::Model};
@@ -6,13 +7,12 @@ use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
-type Seconds = u64;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TokenClaims {
     pub user_uuid: String,
     pub user_name: String,
-    pub exp: Seconds, // u64 更安全
+    pub exp: i64,     // u64 更安全
     pub role_id: i32, //
 }
 
@@ -20,9 +20,8 @@ impl TokenClaims {
     async fn from_user(
         db_pool: &sea_orm::DatabaseConnection,
         user: &Model,
-        ttl: Seconds,
     ) -> Result<Self, AppError> {
-        let exp = (Utc::now() + ChronoDuration::seconds(ttl as i64)).timestamp() as Seconds;
+        let exp = (Utc::now() + ChronoDuration::seconds(CONFIG.jwt.expiry)).timestamp();
         let role_id = Self::get_permission_codes(db_pool, user).await?;
 
         Ok(TokenClaims {
@@ -57,17 +56,15 @@ impl TokenClaims {
 pub async fn generate_jwt(
     db_pool: &sea_orm::DatabaseConnection,
     user: &Model,
-    secret_b64: &str,
-    ttl: Seconds,
 ) -> Result<String, AppError> {
-    let claims = TokenClaims::from_user(db_pool, user, ttl).await?;
-    log::info!("claims: {:?}", claims);
+    let claims = TokenClaims::from_user(db_pool, user).await?;
+    log::info!("claims: {:?},{}", claims, &CONFIG.jwt.secret);
     encode(
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(
             &general_purpose::STANDARD
-                .decode(secret_b64)
+                .decode(&CONFIG.jwt.secret)
                 .map_err(|_| AppError::InternalServerError("JWT 密钥格式错误".into()))?,
         ),
     )
@@ -78,13 +75,13 @@ pub async fn generate_jwt(
 }
 
 /// 解析 JWT
-pub fn decode_jwt(token: &str, secret_b64: &str) -> Result<TokenClaims, AppError> {
+pub fn decode_jwt(token: &str) -> Result<TokenClaims, AppError> {
     let validation = Validation::new(Algorithm::HS256);
     decode::<TokenClaims>(
         token,
         &DecodingKey::from_secret(
             &general_purpose::STANDARD
-                .decode(secret_b64)
+                .decode(&CONFIG.jwt.secret)
                 .map_err(|_| AppError::InternalServerError("JWT 密钥格式错误".into()))?,
         ),
         &validation,
