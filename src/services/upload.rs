@@ -1,3 +1,4 @@
+use crate::config::manager::CONFIG;
 use crate::utils::file_size::FileSize;
 use crate::{ApiResponse, HttpResult, config::AppError};
 use actix_multipart::Multipart;
@@ -22,29 +23,15 @@ const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp"];
 const RESIZE_WIDTH: u32 = 1920;
 const RESIZE_HEIGHT: u32 = 1080;
-
-// 配置结构
-#[derive(Debug, Clone)]
-pub struct QiniuConfig {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QiNiuSettings {
     pub access_key: String,
     pub secret_key: String,
     pub bucket_name: String,
-    pub base_url: String,
+    pub domain_url: String,
     pub token_expiry_secs: u64,
 }
-
-impl Default for QiniuConfig {
-    fn default() -> Self {
-        dotenvy::dotenv().ok();
-        Self {
-            access_key: std::env::var("ACCESS_KEY").expect("ACCESS_KEY must be set"),
-            secret_key: std::env::var("SECRET_KEY").expect("SECRET_KEY must be set"),
-            bucket_name: std::env::var("BUCKET_NAME").expect("BUCKET_NAME must be set"),
-            base_url: std::env::var("BASE_URL").expect("BASE_URL must be set"),
-            token_expiry_secs: 3600,
-        }
-    }
-}
+// 配置结构
 
 // 上传结果
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,18 +46,20 @@ pub struct UploadResult {
 // 文件上传管理器
 #[derive(Clone)]
 pub struct UploadManager {
-    config: QiniuConfig,
+    config: QiNiuSettings,
 }
 
 impl Default for UploadManager {
     fn default() -> Self {
-        Self::new(QiniuConfig::default())
+        Self {
+            config: CONFIG.qi_niu.clone(),
+        }
+        // Self::new(QiniuConfig::default())
     }
 }
 
 impl UploadManager {
-    pub fn new(config: QiniuConfig) -> Self {
-        info!("Upload manager started with bucket: {}", config.bucket_name);
+    pub fn new(config: QiNiuSettings) -> Self {
         Self { config }
     }
 
@@ -316,10 +305,10 @@ impl UploadManager {
 
     /// 构建最终 URL
     fn build_final_url(&self, key: &str) -> String {
-        if self.config.base_url.ends_with('/') {
-            format!("{}{}", self.config.base_url, key)
+        if self.config.domain_url.ends_with('/') {
+            format!("{}{}", self.config.domain_url, key)
         } else {
-            format!("{}/{}", self.config.base_url, key)
+            format!("{}/{}", self.config.domain_url, key)
         }
     }
 }

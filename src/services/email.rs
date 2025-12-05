@@ -7,27 +7,30 @@ use std::time::Duration;
 
 use crate::config::manager::CONFIG;
 
+/// 邮件配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmtpSettings {
+    /// SMTP服务器地址
+    pub smtp_server: String,
+    /// SMTP服务器端口
+    pub smtp_port: u16,
+    /// 发件人邮箱
+    pub from_email: String,
+    /// 发件人邮箱密码或应用专用密码
+    pub from_password: String,
+    /// 验证码有效期（秒）
+    pub code_validity_period: u64,
+}
+
 /// 邮件服务
 pub struct EmailService {
-    /// SMTP服务器地址
-    smtp_server: String,
-    /// SMTP服务器端口
-    smtp_port: u16,
-    /// 发件人邮箱
-    from_email: String,
-    /// 发件人邮箱密码或应用专用密码
-    from_password: String,
-    /// 验证码有效期（秒）
-    code_validity_period: u64,
+    settings: SmtpSettings,
 }
+
 impl Default for EmailService {
     fn default() -> Self {
         Self {
-            smtp_server: CONFIG.smtp.smtp_server.clone(),
-            smtp_port: CONFIG.smtp.smtp_port,
-            from_email: CONFIG.smtp.from_email.clone(),
-            from_password: CONFIG.smtp.from_password.clone(),
-            code_validity_period: CONFIG.smtp.code_validity_period,
+            settings: CONFIG.smtp.clone(),
         }
     }
 }
@@ -57,7 +60,7 @@ impl EmailService {
             </html>
             "#,
             code,
-            self.code_validity_period / 60
+            self.settings.code_validity_period / 60
         );
         // Ok(())
         self.send_email(to_email, subject, &body).await
@@ -85,7 +88,7 @@ impl EmailService {
             "#,
             reset_link,
             reset_link,
-            self.code_validity_period / 60
+            self.settings.code_validity_period / 60
         );
 
         self.send_email(to_email, subject, &body).await
@@ -152,7 +155,8 @@ impl EmailService {
         // 创建邮件
         let email = Message::builder()
             .from(
-                self.from_email
+                self.settings
+                    .from_email
                     .parse()
                     .context("Invalid from email address")?,
             )
@@ -174,10 +178,13 @@ impl EmailService {
             .context("Failed to build email")?;
 
         // 创建SMTP传输
-        let creds = Credentials::new(self.from_email.clone(), self.from_password.clone());
-        let mailer = SmtpTransport::relay(&self.smtp_server)
+        let creds = Credentials::new(
+            self.settings.from_email.clone(),
+            self.settings.from_password.clone(),
+        );
+        let mailer = SmtpTransport::relay(&self.settings.smtp_server)
             .context("Failed to create SMTP transport")?
-            .port(self.smtp_port)
+            .port(self.settings.smtp_port)
             .credentials(creds)
             .build();
 

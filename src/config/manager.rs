@@ -4,27 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use std::env;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QiNiuSettings {
-    pub access_key: String,
-    pub secret_key: String,
-    pub bucket: String,
-    pub domain: String,
-}
-/// 邮件配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SmtpSettings {
-    /// SMTP服务器地址
-    pub smtp_server: String,
-    /// SMTP服务器端口
-    pub smtp_port: u16,
-    /// 发件人邮箱
-    pub from_email: String,
-    /// 发件人邮箱密码或应用专用密码
-    pub from_password: String,
-    /// 验证码有效期（秒）
-    pub code_validity_period: u64,
-}
+use crate::{email::SmtpSettings, upload::QiNiuSettings};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerSettings {
     pub host: String,
@@ -128,8 +109,12 @@ impl Default for AppConfig {
                     .unwrap_or_else(|_| "your_access_key".to_string()),
                 secret_key: env::var("QINIU_SECRET_KEY")
                     .unwrap_or_else(|_| "your_secret_key".to_string()),
-                bucket: env::var("QINIU_BUCKET").unwrap_or_else(|_| "your_bucket".to_string()),
-                domain: env::var("QINIU_DOMAIN").unwrap_or_else(|_| "your_domain".to_string()),
+                bucket_name: env::var("QINIU_BUCKET").unwrap_or_else(|_| "your_bucket".to_string()),
+                domain_url: env::var("QINIU_DOMAIN").unwrap_or_else(|_| "your_domain".to_string()),
+                token_expiry_secs: env::var("QINIU_TOKEN_EXPIRY_SECS")
+                    .unwrap_or_else(|_| "3600".to_string())
+                    .parse()
+                    .unwrap(),
             },
             smtp: SmtpSettings {
                 smtp_server: env::var("SMTP_HOST")
