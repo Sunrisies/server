@@ -1,6 +1,6 @@
 [package]
 name = "web-server"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 license = "MIT"
 
@@ -53,6 +53,8 @@ image = { version = "0.25.8", default-features = false, features = [
 qiniu-upload-manager = "0.2.4"
 config = "0.15.19"
 
+[target.x86_64-unknown-linux-musl.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
 
 [profile.dev]
 opt-level = 0
