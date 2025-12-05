@@ -335,15 +335,13 @@ impl EmailVerificationManager {
     /// 验证验证码
     pub async fn verify_code(&self, email: &str, code: &str) -> Result<bool> {
         let mut codes = self.codes.write().await;
-
-        if let Some(verification_code) = codes.get_mut(email)
-            && verification_code.is_valid(code, self.validity_period)
-        {
-            verification_code.mark_used();
-            return Ok(true);
+        match codes.get_mut(email) {
+            Some(verification_code) if verification_code.is_valid(code, self.validity_period) => {
+                verification_code.mark_used();
+                Ok(true)
+            }
+            _ => Ok(false),
         }
-
-        Ok(false)
     }
 
     /// 启动定期清理过期验证码的任务

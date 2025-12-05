@@ -1,9 +1,10 @@
 use crate::config::AppError;
 use crate::dto::PaginationQuery;
-use crate::dto::posts::PostResponse;
+use crate::dto::posts::{CategoryResponse, PostResponse};
 use crate::dto::tag::{CreateTagRequest, TagCloudItem};
 use crate::dto::{PaginatedResp, Pagination};
-use crate::models::{post_tags, posts, tags};
+use crate::models::tags::PostWithCategory;
+use crate::models::{categories, post_tags, posts, tags};
 use crate::{ApiResponse, HttpResult, RouteInfo, utils::db_err_map};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
@@ -24,29 +25,51 @@ crud_entity!({
 
 pub async fn get_tags_with_count_handler(db_pool: web::Data<DatabaseConnection>) -> HttpResult {
     // 构建查询：统计每个标签的使用次数（只统计已发布的文章）
+    // let tag_counts = tags::Entity::find()
+    //     .column_as(tags::Column::Id, "id")
+    //     .column_as(tags::Column::Name, "name")
+    //     .column_as(
+    //         Expr::col((post_tags::Entity, post_tags::Column::PostId)).count_distinct(),
+    //         "count",
+    //     )
+    //     .join(
+    //         sea_orm::JoinType::LeftJoin,
+    //         post_tags::Relation::Tags.def().rev(), // 使用关系的反向
+    //     )
+    //     .join(
+    //         sea_orm::JoinType::LeftJoin,
+    //         posts::Relation::PostTags.def().rev(), // 使用关系的反向
+    //     )
+    //     .group_by(tags::Column::Id)
+    //     .group_by(tags::Column::Name)
+    //     .order_by_desc(Expr::cust("count"))
+    //     .into_model::<TagCloudItem>()
+    //     .all(db_pool.as_ref())
+    //     .await?;
     let tag_counts = tags::Entity::find()
         .column_as(tags::Column::Id, "id")
         .column_as(tags::Column::Name, "name")
         .column_as(
-            Expr::col((post_tags::Entity, post_tags::Column::PostId)).count_distinct(),
+            Expr::col(post_tags::Column::PostId).count_distinct(),
             "count",
         )
+        .join(sea_orm::JoinType::InnerJoin, tags::Relation::PostTags.def())
         .join(
-            sea_orm::JoinType::LeftJoin,
-            post_tags::Relation::Tags.def().rev(), // 使用关系的反向
-        )
-        .join(
-            sea_orm::JoinType::LeftJoin,
-            posts::Relation::PostTags.def().rev(), // 使用关系的反向
+            sea_orm::JoinType::InnerJoin,
+            post_tags::Relation::Posts.def(),
         )
         .group_by(tags::Column::Id)
         .group_by(tags::Column::Name)
-        .order_by_desc(Expr::cust("count"))
+        .having(Expr::expr(Expr::col(post_tags::Column::PostId).count_distinct()).gt(0))
+        .order_by_desc(Expr::expr(
+            Expr::col(post_tags::Column::PostId).count_distinct(),
+        ))
         .into_model::<TagCloudItem>()
         .all(db_pool.as_ref())
         .await?;
     Ok(ApiResponse::success(tag_counts, "成功").to_http_response())
 }
+
 /// 通过tag获取文章列表
 pub async fn get_posts_by_tag_handler(
     db_pool: web::Data<DatabaseConnection>,
@@ -57,66 +80,74 @@ pub async fn get_posts_by_tag_handler(
     let PaginationQuery { page, limit } = query.into_inner();
 
     // 1. 查询标签是否存在
-    let tag = tags::Entity::find_by_id(tag_id)
+    if tags::Entity::find_by_id(tag_id)
         .one(db_pool.as_ref())
         .await
         .map_err(|e| {
             log::error!("查询标签失败: {}", e);
             AppError::DatabaseConnectionError("查询失败".to_string())
-        })?;
-
-    let _tag = match tag {
-        Some(tag) => tag,
-        None => {
-            return Err(AppError::NotFound("标签不存在".to_string()));
-        }
-    };
+        })?
+        .is_none()
+    {
+        return Err(AppError::NotFound("标签不存在".to_string()));
+    }
 
     // 2. 查询该标签下的所有文章
-    let paginator = post_tags::Entity::find()
+    let posts = posts::Entity::find()
+        .select_only()
+        .column(posts::Column::Id)
+        .column(posts::Column::Uuid)
+        .column(posts::Column::Title)
+        .column(posts::Column::CoverImage)
+        .column(posts::Column::PublishedAt)
+        .column(posts::Column::UpdatedAt)
+        .column(posts::Column::ViewCount)
+        .column(posts::Column::Featured)
+        .column(posts::Column::Status)
+        .column(posts::Column::Summary)
+        .column(posts::Column::Size)
+        .column_as(categories::Column::Id, "category_id")
+        .column_as(categories::Column::Name, "category_name")
+        .join(
+            sea_orm::JoinType::InnerJoin,
+            posts::Relation::PostTags.def(),
+        )
         .filter(post_tags::Column::TagId.eq(tag_id))
-        .find_also_related(posts::Entity)
-        // .filter(posts::Column::Status.eq(1)) // 只查询已发布的文章
+        .join(
+            sea_orm::JoinType::LeftJoin,
+            posts::Relation::Categories.def(),
+        )
+        // .filter(posts::Column::Status.eq(1))
         .order_by_desc(posts::Column::PublishedAt)
-        // .into_tuple::<(post_tags::Model, Option<posts::Model>)>()
+        .into_model::<PostWithCategory>()
         .paginate(db_pool.as_ref(), limit);
 
-    let total = paginator.num_items().await?;
-    let posts_with_relations = paginator.fetch_page(page - 1).await?;
-    log::info!(
-        "total: {}, page: {}, limit: {}, posts_with_relations: {:?}",
-        total,
-        page,
-        limit,
-        posts_with_relations
-    );
+    let total = posts.num_items().await?;
+    log::info!("查询标签下的文章: {}", total);
+    let posts_with_relations = posts.fetch_page(page - 1).await?;
     // 3. 构建响应数据
     let posts: Vec<PostResponse> = posts_with_relations
         .into_iter()
-        .filter_map(|(_post_tag, post_option)| post_option) // 只保留存在的文章
-        .map(|post| {
-            let category = None; // 这里可以根据需要查询分类
-            let tags = vec![]; // 这里可以根据需要查询标签
-            let author = "朝阳".to_string(); // 这里需要从用户表查询真实作者名
-
-            PostResponse {
-                id: post.id,
-                uuid: post.uuid,
-                title: post.title,
-                // content: post.markdowncontent,
-                cover: post.cover_image.unwrap_or_default(),
-                author,
-                publish_time: post.published_at,
-                update_time: post.updated_at,
-                views: post.view_count,
-                is_top: post.featured,
-                is_publish: post.status == 1,
-                is_hide: post.status == 2,
-                description: post.summary.unwrap_or_default(),
-                size: post.size,
-                category,
-                tags,
-            }
+        .map(|post| PostResponse {
+            id: post.id,
+            uuid: post.uuid,
+            title: post.title,
+            cover: post.cover_image.unwrap_or_default(),
+            author: "朝阳".to_string(),
+            publish_time: post.published_at,
+            update_time: post.updated_at,
+            views: post.view_count,
+            is_top: post.featured,
+            is_publish: post.status == 1,
+            is_hide: post.status == 2,
+            description: post.summary.unwrap_or_default(),
+            size: post.size,
+            // category,
+            category: post.category_id.map(|id| CategoryResponse {
+                id,
+                name: post.category_name.unwrap_or_default(),
+            }),
+            tags: vec![],
         })
         .collect();
 
