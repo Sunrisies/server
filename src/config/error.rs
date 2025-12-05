@@ -52,38 +52,9 @@ pub enum AppError {
 
 impl AppError {
     // 获取错误码
-    pub fn code(&self) -> &'static str {
-        match self {
-            AppError::Unauthorized(_) => "UNAUTHORIZED",
-            AppError::Forbidden(_) => "FORBIDDEN",
-            AppError::InvalidCredentials(_) => "INVALID_CREDENTIALS",
-            AppError::TokenExpired(_) => "TOKEN_EXPIRED",
-            AppError::TokenInvalid(_) => "TOKEN_INVALID",
-            AppError::BadRequest(_) => "BAD_REQUEST",
-            AppError::ValidationError(_) => "VALIDATION_ERROR",
-            AppError::UnprocessableEntity(_) => "UNPROCESSABLE_ENTITY",
-            AppError::NotFound(_) => "NOT_FOUND",
-            AppError::AlreadyExists(_) => "ALREADY_EXISTS",
-            AppError::Conflict(_) => "CONFLICT",
-            AppError::RateLimited(_) => "RATE_LIMITED",
-            AppError::FileTooLarge(_) => "FILE_TOO_LARGE",
-            AppError::UnsupportedFileType(_) => "UNSUPPORTED_FILE_TYPE",
-            AppError::UploadFailed(_) => "UPLOAD_FAILED",
-            AppError::DatabaseError(_) => "DATABASE_ERROR",
-            AppError::DatabaseTimeout(_) => "DATABASE_TIMEOUT",
-            AppError::DatabaseConnectionError(_) => "DATABASE_CONNECTION_ERROR",
-            AppError::ExternalServiceError(_) => "EXTERNAL_SERVICE_ERROR",
-            AppError::EmailServiceError(_) => "EMAIL_SERVICE_ERROR",
-            AppError::SearchServiceError(_) => "SEARCH_SERVICE_ERROR",
-            AppError::StorageServiceError(_) => "STORAGE_SERVICE_ERROR",
-            AppError::InternalServerError(_) => "INTERNAL_SERVER_ERROR",
-            AppError::ConfigurationError(_) => "CONFIGURATION_ERROR",
-            AppError::EncryptionError(_) => "ENCRYPTION_ERROR",
-            AppError::NotImplemented(_) => "NOT_IMPLEMENTED",
-            AppError::MaintenanceMode(_) => "MAINTENANCE_MODE",
-        }
+    pub fn code(&self) -> i32 {
+        self.status_code().as_u16() as i32
     }
-
     // 获取 HTTP 状态码
     pub fn status_code(&self) -> StatusCode {
         match self {
@@ -123,6 +94,14 @@ impl AppError {
                 Some(serde_json::to_value(field_errors).unwrap())
             }
             _ => None,
+        }
+    }
+    // 转换为 ApiResponse
+    pub fn to_response(&self) -> ApiResponse<serde_json::Value> {
+        ApiResponse {
+            code: self.code(),
+            message: self.to_string(),
+            data: self.details(),
         }
     }
 }
@@ -168,11 +147,7 @@ impl fmt::Display for AppError {
 // 实现 ResponseError trait 用于 Actix-web 错误处理
 impl ResponseError for AppError {
     fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.status_code()).json(ApiResponse::<()> {
-            code: self.status_code().as_u16() as i32,
-            message: self.to_string(),
-            data: None,
-        })
+        HttpResponse::build(self.status_code()).json(self.to_response())
     }
 }
 
@@ -209,73 +184,6 @@ impl From<jsonwebtoken::errors::Error> for AppError {
                 AppError::TokenExpired("Token has expired".to_string())
             }
             _ => AppError::TokenInvalid("Invalid token".to_string()),
-        }
-    }
-}
-
-// 错误响应格式
-#[derive(Serialize)]
-pub struct ErrorResponse {
-    pub error: ErrorDetail,
-}
-
-#[derive(Serialize)]
-pub struct ErrorDetail {
-    pub code: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<serde_json::Value>,
-}
-
-// 为 AppError 实现到 ErrorResponse 的转换
-impl From<AppError> for ErrorResponse {
-    fn from(error: AppError) -> Self {
-        let (code, message, details) = match error {
-            AppError::ValidationError(field_errors) => (
-                "VALIDATION_ERROR".to_string(),
-                "One or more validation errors occurred".to_string(),
-                Some(serde_json::to_value(field_errors).unwrap()),
-            ),
-            _ => {
-                let code = match error {
-                    AppError::ValidationError(_) => "VALIDATION_ERROR",
-                    AppError::Unauthorized(_) => "UNAUTHORIZED",
-                    AppError::Forbidden(_) => "FORBIDDEN",
-                    AppError::InvalidCredentials(_) => "INVALID_CREDENTIALS",
-                    AppError::TokenExpired(_) => "TOKEN_EXPIRED",
-                    AppError::TokenInvalid(_) => "TOKEN_INVALID",
-                    AppError::BadRequest(_) => "BAD_REQUEST",
-                    AppError::UnprocessableEntity(_) => "UNPROCESSABLE_ENTITY",
-                    AppError::NotFound(_) => "NOT_FOUND",
-                    AppError::AlreadyExists(_) => "ALREADY_EXISTS",
-                    AppError::Conflict(_) => "CONFLICT",
-                    AppError::RateLimited(_) => "RATE_LIMITED",
-                    AppError::FileTooLarge(_) => "FILE_TOO_LARGE",
-                    AppError::UnsupportedFileType(_) => "UNSUPPORTED_FILE_TYPE",
-                    AppError::UploadFailed(_) => "UPLOAD_FAILED",
-                    AppError::DatabaseError(_) => "DATABASE_ERROR",
-                    AppError::DatabaseTimeout(_) => "DATABASE_TIMEOUT",
-                    AppError::DatabaseConnectionError(_) => "DATABASE_CONNECTION_ERROR",
-                    AppError::ExternalServiceError(_) => "EXTERNAL_SERVICE_ERROR",
-                    AppError::EmailServiceError(_) => "EMAIL_SERVICE_ERROR",
-                    AppError::SearchServiceError(_) => "SEARCH_SERVICE_ERROR",
-                    AppError::StorageServiceError(_) => "STORAGE_SERVICE_ERROR",
-                    AppError::InternalServerError(_) => "INTERNAL_SERVER_ERROR",
-                    AppError::ConfigurationError(_) => "CONFIGURATION_ERROR",
-                    AppError::EncryptionError(_) => "ENCRYPTION_ERROR",
-                    AppError::NotImplemented(_) => "NOT_IMPLEMENTED",
-                    AppError::MaintenanceMode(_) => "MAINTENANCE_MODE",
-                };
-                (code.to_string(), error.to_string(), None)
-            }
-        };
-
-        ErrorResponse {
-            error: ErrorDetail {
-                code,
-                message,
-                details,
-            },
         }
     }
 }
