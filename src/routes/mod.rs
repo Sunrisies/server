@@ -6,8 +6,10 @@ pub mod rooms;
 pub mod tags;
 pub mod upload;
 pub mod users;
-
+mod version;
 use actix_web::web;
+
+use crate::routes::version::get_version;
 
 pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -27,6 +29,8 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
             // 邮件路由
             .configure(email::config_routes)
             // 房间路由
-            .configure(rooms::config_routes),
+            .configure(rooms::config_routes)
+            // 获取当前版本信息
+            .route("/v1/version", web::get().to(get_version)),
     );
 }

@@ -46,9 +46,9 @@ impl<'a> OpenApiGenerator<'a> {
             "uuid" => "UUID 标识符",
             _ => "数字 ID",
         };
-        println!("route_path: {}", route_path);
-        println!("id_description: {}", id_description);
-        println!("生成的 OpenAPI 文档: {}, id_type:{}", entity_str, id_type);
+        // println!("route_path: {}", route_path);
+        // println!("id_description: {}", id_description);
+        // println!("生成的 OpenAPI 文档: {}, id_type:{}", entity_str, id_type);
         quote! {
             #[utoipa::path(
                 get,

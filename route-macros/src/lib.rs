@@ -19,6 +19,5 @@ pub fn crud_entity(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// 刷新并显示所有日志
 #[proc_macro]
 pub fn flush_crud_logs(_input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    println!("---------------------- CRUD 宏日志 ------------------");
     log::flush_crud_logs(_input)
 }
