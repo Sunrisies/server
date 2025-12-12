@@ -11,3 +11,4 @@ pub mod room_messages;
 pub mod rooms;
 pub mod upload;
 pub use email::send_verification_code;
+pub mod links;

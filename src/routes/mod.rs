@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod categories;
 pub mod email;
+pub mod links;
 pub mod posts;
 pub mod rooms;
 pub mod tags;
@@ -24,6 +25,8 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
             .configure(categories::config_routes)
             // 标签路由
             .configure(tags::config_routes)
+            // 链接路由
+            .configure(links::config_routes)
             // 上传路由
             .configure(upload::config_routes)
             // 邮件路由

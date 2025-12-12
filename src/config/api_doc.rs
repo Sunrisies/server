@@ -20,17 +20,17 @@ use utoipa::OpenApi;
         ),
     ),
     paths(
-        // 权限模块的
-        auth::register, // 注册
-        auth::login, // 登录
-        get_users_handler
-        // get_users_handler // 获取单个用户
-        // users::get_users, // 获取用户列表
-        // users::get_user_uuid, // 获取单个用户
-        // users::delete_user_uuid, // 删除用户
-        // category::create_category, // 创建分类
-        // category::get_categories, // 获取分类列表
-        // category::get_category_uuid, // 获取单个分类
+        auth::register,
+        auth::login,
+        get_users_handler,
+        // crate::handlers::links::list_links_handler,
+        // crate::handlers::links::click_link_handler,
+        // crate::handlers::links::redirect_link_handler,
+        // crate::handlers::links::update_link_handler,
+        // crate::handlers::links::external_links_routes::create_external_links_handler,
+        // crate::handlers::links::external_links_routes::delete_external_links_handler,
+        // crate::handlers::links::external_links_routes::get_external_links_all_handler,
+        // crate::handlers::links::external_links_routes::get_external_links_handler
     )
 )]
 pub struct ApiDoc;
