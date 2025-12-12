@@ -295,10 +295,21 @@ fn generate_create_code(
     };
 
     quote! {
+         use validator::Validate;
        pub async fn #create_fn(
             db: &DatabaseConnection,
             data: #create_request_type,
         ) ->Result<#entity::Model, AppError> {
+            if let Err(errors) = data.validate() {
+                println!("Validation errors: {:?}", errors);
+                let msg = ValidationErrorJson::from_validation_errors(&errors);
+                return Err(AppError::ValidationError(msg));
+            }
+
+            let existing = #entity::Entity::check_unique(db,data.name.to_string()).await?;
+            if existing.is_some() {
+                return  Err(AppError::DatabaseConnectionError("分类已存在".to_string()))
+            }
             let active_model = #entity::ActiveModel::from(data);
 
             let model = active_model.insert(db).await.map_err(|e| {

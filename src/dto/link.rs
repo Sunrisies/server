@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
 use validator::{Validate, ValidationError};
-
 fn validate_protocol(url: &str) -> Result<(), ValidationError> {
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err(ValidationError::new("invalid_protocol"));

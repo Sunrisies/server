@@ -1,12 +1,14 @@
 use sea_orm::{ActiveValue::Set, FromQueryResult};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use validator::Validate;
 
 use crate::models::tags;
 
 /// 创建标签的请求体
-#[derive(Deserialize, ToSchema, Debug)]
+#[derive(Deserialize, ToSchema, Debug, Validate)]
 pub struct CreateTagRequest {
+    #[validate(length(min = 1, message = "名称不能为空"))]
     #[schema(example = "Rust")]
     pub name: String,
 }

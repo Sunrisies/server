@@ -16,7 +16,15 @@ pub struct Model {
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
 }
-
+impl Entity {
+    /// 检查唯一性约束
+    pub async fn check_unique(
+        db: &DatabaseConnection,
+        name: String,
+    ) -> Result<Option<Model>, DbErr> {
+        Self::find().filter(Column::Name.eq(name)).one(db).await
+    }
+}
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_many = "super::post_tags::Entity")]

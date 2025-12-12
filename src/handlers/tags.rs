@@ -2,6 +2,7 @@ use crate::config::AppError;
 use crate::dto::PaginationQuery;
 use crate::dto::posts::{CategoryResponse, PostResponse};
 use crate::dto::tag::{CreateTagRequest, TagCloudItem};
+use crate::dto::user::ValidationErrorJson;
 use crate::dto::{PaginatedResp, Pagination};
 use crate::models::tags::PostWithCategory;
 use crate::models::{categories, post_tags, posts, tags};
