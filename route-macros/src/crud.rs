@@ -270,7 +270,6 @@ fn generate_read_code(
         }
     }
 }
-
 fn generate_create_code(
     entity: &Ident,
     route_prefix: &LitStr,
@@ -295,8 +294,8 @@ fn generate_create_code(
     };
 
     quote! {
-         use validator::Validate;
-       pub async fn #create_fn(
+        use validator::Validate;
+        pub async fn #create_fn(
             db: &DatabaseConnection,
             data: #create_request_type,
         ) ->Result<#entity::Model, AppError> {
@@ -305,15 +304,11 @@ fn generate_create_code(
                 let msg = ValidationErrorJson::from_validation_errors(&errors);
                 return Err(AppError::ValidationError(msg));
             }
-
-            let existing = #entity::Entity::check_unique(db,data.name.to_string()).await?;
-            if existing.is_some() {
-                return  Err(AppError::DatabaseConnectionError("分类已存在".to_string()))
-            }
+            check_unique_field!(#entity, db, Name, data.name);
             let active_model = #entity::ActiveModel::from(data);
 
             let model = active_model.insert(db).await.map_err(|e| {
-                println!("添加分类失败: {}", e);
+                println!("添加失败: {}", e);
                 AppError::DatabaseConnectionError(db_err_map(e).to_owned())
             })?;
 

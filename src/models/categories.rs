@@ -1,4 +1,4 @@
-use crate::utils::fmt_beijing;
+use crate::{impl_entity_unique_check, utils::fmt_beijing};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -27,24 +27,6 @@ pub enum Relation {
     Posts,
 }
 
-impl Entity {
-    /// 按任意唯一列查询（编译期已知列 & 值类型）
-    pub fn find_by_col<C, V>(col: C, val: V) -> Select<Self>
-    where
-        C: ColumnTrait,
-        V: Into<sea_orm::Value>,
-    {
-        Self::find().filter(col.eq(val))
-    }
-    /// 检查唯一性约束
-    pub async fn check_unique(
-        db: &DatabaseConnection,
-        name: String,
-    ) -> Result<Option<Model>, DbErr> {
-        Self::find().filter(Column::Name.eq(name)).one(db).await
-    }
-}
-
 impl Related<super::posts::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Posts.def()
@@ -52,3 +34,5 @@ impl Related<super::posts::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+// impl_entity_unique_check!(Model, name, name);
+impl_entity_unique_check!(Entity, Model);
