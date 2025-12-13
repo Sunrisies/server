@@ -6,6 +6,7 @@ use actix_web::{
 };
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
+use web_server::utils::json_err_map;
 use web_server::{
     SseNotifier,
     config::{init_logger, manager::CONFIG, write_to_file},
@@ -74,6 +75,7 @@ async fn main() -> Result<()> {
             .max_age(3600);
         App::new()
             .wrap(Auth)
+            .app_data(web::JsonConfig::default().error_handler(|err, _| json_err_map(err)))
             .app_data(db_pool.clone())
             .app_data(notifier.clone())
             .app_data(chat_server.clone()) // 共享聊天服务器状态

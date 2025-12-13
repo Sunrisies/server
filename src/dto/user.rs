@@ -127,17 +127,6 @@ impl ValidationErrorJson {
         ValidationErrorJson { errors: list }
     }
 }
-// impl fmt::Display for ValidationErrorJson {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         let parts = self
-//             .errors
-//             .iter()
-//             .map(|item| format!("{}: {}", item.name, item.error));
-//         // 多个错误信息用分号分隔
-//         write!(f, "{}", parts.collect::<Vec<_>>().join("; "))
-//         // write!(f, "{}", parts.join("; "))
-//     }
-// }
 
 impl fmt::Display for ValidationErrorMsg<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
