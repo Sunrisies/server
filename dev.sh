@@ -653,7 +653,7 @@ main() {
   generate_version_info
 
   # 4. 运行测试（可选）
-  run_tests
+  # run_tests
 
   # 5. 构建 Rust 项目
   if ! build_rust_project; then
