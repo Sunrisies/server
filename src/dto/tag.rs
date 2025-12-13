@@ -1,4 +1,4 @@
-use sea_orm::{ActiveValue::Set, FromQueryResult};
+use sea_orm::FromQueryResult;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -13,18 +13,22 @@ pub struct CreateTagRequest {
     pub name: String,
 }
 
-impl From<CreateTagRequest> for tags::ActiveModel {
-    fn from(request: CreateTagRequest) -> Self {
-        log::info!(
-            "Converting CreateTagRequest to Tags ActiveModel: {:?}",
-            request
-        );
-        tags::ActiveModel {
-            name: Set(request.name),
-            ..Default::default()
-        }
-    }
-}
+// impl From<CreateTagRequest> for tags::ActiveModel {
+//     fn from(request: CreateTagRequest) -> Self {
+//         log::info!(
+//             "Converting CreateTagRequest to Tags ActiveModel: {:?}",
+//             request
+//         );
+//         tags::ActiveModel {
+//             name: Set(request.name),
+//             ..Default::default()
+//         }
+//     }
+// }
+// 使用宏重写你的代码
+impl_from_request!(CreateTagRequest => tags::ActiveModel {
+    name
+});
 
 #[derive(Debug, Serialize, FromQueryResult)]
 pub struct TagCloudItem {

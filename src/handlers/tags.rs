@@ -25,28 +25,6 @@ crud_entity!({
 });
 
 pub async fn get_tags_with_count_handler(db_pool: web::Data<DatabaseConnection>) -> HttpResult {
-    // 构建查询：统计每个标签的使用次数（只统计已发布的文章）
-    // let tag_counts = tags::Entity::find()
-    //     .column_as(tags::Column::Id, "id")
-    //     .column_as(tags::Column::Name, "name")
-    //     .column_as(
-    //         Expr::col((post_tags::Entity, post_tags::Column::PostId)).count_distinct(),
-    //         "count",
-    //     )
-    //     .join(
-    //         sea_orm::JoinType::LeftJoin,
-    //         post_tags::Relation::Tags.def().rev(), // 使用关系的反向
-    //     )
-    //     .join(
-    //         sea_orm::JoinType::LeftJoin,
-    //         posts::Relation::PostTags.def().rev(), // 使用关系的反向
-    //     )
-    //     .group_by(tags::Column::Id)
-    //     .group_by(tags::Column::Name)
-    //     .order_by_desc(Expr::cust("count"))
-    //     .into_model::<TagCloudItem>()
-    //     .all(db_pool.as_ref())
-    //     .await?;
     let tag_counts = tags::Entity::find()
         .column_as(tags::Column::Id, "id")
         .column_as(tags::Column::Name, "name")

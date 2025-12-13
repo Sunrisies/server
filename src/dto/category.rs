@@ -1,5 +1,4 @@
 use crate::models::categories;
-use sea_orm::ActiveValue::Set;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use validator::Validate;
@@ -17,17 +16,8 @@ pub struct CreateCategoryRequest {
     pub description: Option<String>,
 }
 
-impl From<CreateCategoryRequest> for categories::ActiveModel {
-    fn from(request: CreateCategoryRequest) -> Self {
-        log::info!(
-            "Converting CreateCategoryRequest to Category ActiveModel: {:?}",
-            request
-        );
-        categories::ActiveModel {
-            name: Set(request.name),
-            slug: Set(request.slug),
-            description: Set(request.description),
-            ..Default::default()
-        }
-    }
-}
+impl_from_request!(CreateCategoryRequest => categories::ActiveModel {
+    name,
+    slug,
+    description,
+});
