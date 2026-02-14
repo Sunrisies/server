@@ -28,8 +28,9 @@ pub struct PaginationQuery {
     #[param(example = json!(10))]
     pub limit: u64,
     /// 分类搜索
-    /// #[param(example = json!("tech"))]
     pub category: Option<i32>,
+    /// 标签搜索
+    pub tag: Option<i32>,
 }
 fn default_page() -> u64 {
     1
