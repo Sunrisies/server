@@ -221,7 +221,7 @@ fn generate_read_code(
                 db: web::Data<DatabaseConnection>,
                 query: web::Query<PaginationQuery>,
             ) -> HttpResult {
-                let PaginationQuery { page, limit } = query.into_inner();
+                let PaginationQuery { page, limit,.. } = query.into_inner();
                 match #custom_fn_name(db.get_ref(), page, limit).await {
                     Ok(result) => Ok(result),
                     Err(e) => {
@@ -452,7 +452,7 @@ fn generate_list_code(
             db: web::Data<DatabaseConnection>,
             query: web::Query<PaginationQuery>,
         ) -> HttpResult {
-            let PaginationQuery { page, limit } = query.into_inner();
+            let PaginationQuery { page, limit ,..} = query.into_inner();
             let result =  #get_fn(db.as_ref(), page, limit).await?;
             // 4. 统一出口
             Ok(result)

@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use serde::{ Deserialize, Serialize };
+use utoipa::{ IntoParams, ToSchema };
 use validator::Validate;
 #[derive(Serialize, ToSchema)]
 pub struct Pagination {
@@ -27,6 +27,9 @@ pub struct PaginationQuery {
     #[serde(default = "default_limit")]
     #[param(example = json!(10))]
     pub limit: u64,
+    /// 分类搜索
+    /// #[param(example = json!("tech"))]
+    pub category: Option<i32>,
 }
 fn default_page() -> u64 {
     1

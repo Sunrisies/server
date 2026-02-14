@@ -32,12 +32,27 @@ pub async fn get_posts_all_handler(
     db_pool: web::Data<DatabaseConnection>,
     query: web::Query<PaginationQuery>,
 ) -> HttpResult {
-    let PaginationQuery { page, limit } = query.into_inner();
+    let PaginationQuery { page, limit,category } = query.into_inner();
+ // 1. 构建基础查询（文章 + 分类）
+    let mut query_builder = posts::Entity::find()
+        .find_also_related(categories::Entity);
+
     // 1. 首先查询文章和分类（一对多关系）
-    let paginator = posts::Entity::find()
-        .find_also_related(categories::Entity)
-        .order_by_desc(posts::Column::CreatedAt)
-        .paginate(db_pool.as_ref(), limit);
+    // let paginator = posts::Entity::find()
+    //     .find_also_related(categories::Entity)
+    //     .order_by_desc(posts::Column::CreatedAt)
+    //     .paginate(db_pool.as_ref(), limit);
+    //         .find_also_related(categories::Entity);
+
+    // 新增：如果传入了分类ID，则添加过滤条件
+    if let Some(cat_id) = category {
+        // 假设 category 是 i32 类型（分类ID），且 posts 表有 category_id 字段
+        query_builder = query_builder.filter(posts::Column::CategoryId.eq(cat_id));
+    }
+        // 按创建时间倒序
+    let query_builder = query_builder.order_by_desc(posts::Column::CreatedAt);
+        // 分页查询（总数会自动应用过滤条件，无需额外处理）
+    let paginator = query_builder.paginate(db_pool.as_ref(), limit);
     let total = match paginator.num_items().await {
         Ok(t) => t,
         Err(e) => {

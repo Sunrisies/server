@@ -56,7 +56,7 @@ pub async fn get_posts_by_tag_handler(
     query: web::Query<PaginationQuery>,
 ) -> HttpResult {
     let tag_id = path.into_inner();
-    let PaginationQuery { page, limit } = query.into_inner();
+    let PaginationQuery { page, limit,.. } = query.into_inner();
 
     // 1. 查询标签是否存在
     if tags::Entity::find_by_id(tag_id)
