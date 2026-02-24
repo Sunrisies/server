@@ -1,5 +1,5 @@
 # 构建阶段
-FROM rust:1.86.0-alpine AS builder
+FROM rust:1.93.1-alpine AS builder
 
 RUN apk add --no-cache build-base openssl perl
 
