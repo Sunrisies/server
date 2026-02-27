@@ -1,10 +1,11 @@
 use actix_web::{HttpResponse, ResponseError, http::StatusCode};
 use serde::Serialize;
 use std::fmt;
+use utoipa::ToSchema;
 
 use crate::{ApiResponse, dto::user::ValidationErrorJson};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub enum AppError {
     // 认证相关错误 (4xx)
     Unauthorized(String),

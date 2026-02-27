@@ -7,6 +7,7 @@ pub mod users;
 pub use users::users_routes::*;
 pub mod email;
 pub mod posts;
+pub use posts::get_posts_all_handler;
 pub mod room_messages;
 pub mod rooms;
 pub mod upload;

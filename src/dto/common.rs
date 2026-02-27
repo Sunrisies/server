@@ -1,5 +1,5 @@
-use serde::{ Deserialize, Serialize };
-use utoipa::{ IntoParams, ToSchema };
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 #[derive(Serialize, ToSchema)]
 pub struct Pagination {
