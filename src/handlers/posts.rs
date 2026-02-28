@@ -2,6 +2,8 @@ use crate::config::AppError;
 use crate::dto::PaginatedResp;
 use crate::dto::PaginationQuery;
 use crate::dto::common::Pagination;
+use crate::dto::posts::PrevNextResponse;
+use crate::dto::posts::PrevNextResult;
 use crate::dto::posts::TimelineResponse;
 use crate::dto::posts::UpdatePostRequest;
 use crate::dto::posts::{
@@ -26,7 +28,6 @@ use sea_orm::{
     prelude::Expr,
     sea_query::Alias,
 };
-use serde::Serialize;
 use tokio::try_join;
 use validator::Validate;
 
@@ -305,25 +306,26 @@ pub async fn get_posts_handler(
     Ok(ApiResponse::success(response, "成功").to_http_response())
 }
 
-/// prevNext 或者文章的上一篇跟下一篇
+/// 为获取上一篇和下一篇文章的处理函数添加OpenAPI文档
+#[utoipa::path(
+    summary = "获取上一篇和下一篇文章",
+    tag="文章",
+    description = "根据当前文章的UUID获取上一篇和下一篇文章的信息",
+    get,
+    path = "/api/v1/posts/{uuid}/prevnext",
+    params(
+        ("uuid" = String, Path, description = "当前文章UUID")
+    ),
+    responses(
+        (status = 200, description = "成功获取上一篇和下一篇文章", body = ApiResponse<PrevNextResult>),
+        (status = 404, description = "文章不存在", body = ApiResponse<ValidationErrorJson>),
+        (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)
+    ),
+)]
 pub async fn get_prev_next_handler(
     db_pool: web::Data<DatabaseConnection>,
     page: web::Path<String>,
 ) -> HttpResult {
-    #[derive(Debug, FromQueryResult, Serialize)]
-    struct PrevNextResponse {
-        title: String,
-        uuid: String,
-    }
-
-    #[derive(Debug, Serialize)]
-    struct PrevNextResult {
-        #[serde(rename = "prevArticle")]
-        prev_article: Option<PrevNextResponse>,
-        #[serde(rename = "nextArticle")]
-        next_article: Option<PrevNextResponse>,
-    }
-
     // 将转换函数提取出来，避免重复
     fn to_response(post: posts::Model) -> PrevNextResponse {
         PrevNextResponse {
@@ -367,7 +369,20 @@ pub async fn get_prev_next_handler(
     .to_http_response())
 }
 
-/// 创建文章处理器
+/// 为创建文章的处理函数添加OpenAPI文档
+#[utoipa::path(
+    summary = "创建文章",
+    tag="文章",
+    description = "创建新文章",
+    post,
+    path = "/api/v1/posts",
+    request_body = CreatePostRequest,
+    responses(
+        (status = 200, description = "文章创建成功", body = ApiResponse<PostResponse>),
+        (status = 400, description = "请求参数验证失败", body = ApiResponse<ValidationErrorJson>),
+        (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)
+    ),
+)]
 pub async fn create_post_handler(
     db_pool: web::Data<DatabaseConnection>,
     post_data: web::Json<CreatePostRequest>, // 从认证中间件获取用户ID

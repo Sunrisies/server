@@ -1,5 +1,6 @@
 // src/models/responses.rs
 use crate::utils::fmt_beijing;
+use sea_orm::FromQueryResult;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -120,4 +121,18 @@ pub struct UpdatePostRequest {
 pub struct TimelineResponse {
     pub date: String, // 格式为 "YYYY-MM-DD"
     pub count: i64,
+}
+
+#[derive(Debug, FromQueryResult, Serialize, ToSchema)]
+pub struct PrevNextResponse {
+    pub title: String,
+    pub uuid: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PrevNextResult {
+    #[serde(rename = "prevArticle")]
+    pub prev_article: Option<PrevNextResponse>,
+    #[serde(rename = "nextArticle")]
+    pub next_article: Option<PrevNextResponse>,
 }
