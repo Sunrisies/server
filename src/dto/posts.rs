@@ -114,3 +114,10 @@ pub struct UpdatePostRequest {
 
     pub featured: Option<bool>,
 }
+
+// 定义时间轴响应结构体
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TimelineResponse {
+    pub date: String, // 格式为 "YYYY-MM-DD"
+    pub count: i64,
+}

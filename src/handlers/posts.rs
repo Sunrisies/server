@@ -2,6 +2,7 @@ use crate::config::AppError;
 use crate::dto::PaginatedResp;
 use crate::dto::PaginationQuery;
 use crate::dto::common::Pagination;
+use crate::dto::posts::TimelineResponse;
 use crate::dto::posts::UpdatePostRequest;
 use crate::dto::posts::{
     CategoryResponse, CreatePostRequest, PostListResponse, PostResponse, TagResponse,
@@ -177,7 +178,18 @@ pub async fn get_posts_all_handler(
     Ok(ApiResponse::success(resp, "成功").to_http_response())
 }
 
-/// 现在请根据文章的创建时间返回时间轴,
+/// 为时间轴处理函数添加OpenAPI文档
+#[utoipa::path(
+    summary = "获取文章时间轴",
+    tag="文章",
+    description = "根据文章的创建时间返回时间轴",
+    get,
+    path = "/api/v1/timeline",
+    responses(
+        (status = 200, description = "成功获取文章时间轴", body = ApiResponse<Vec<TimelineResponse>>),
+        (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)
+    ),
+)]
 pub async fn get_timeline_handler(db_pool: web::Data<DatabaseConnection>) -> HttpResult {
     #[derive(Debug, FromQueryResult)]
     struct TimelineCount {
@@ -206,6 +218,22 @@ pub async fn get_timeline_handler(db_pool: web::Data<DatabaseConnection>) -> Htt
     Ok(ApiResponse::success(resp, "成功").to_http_response())
 }
 
+// 为获取文章详情的处理函数添加OpenAPI文档
+#[utoipa::path(
+    summary = "获取文章详情",
+    tag="文章",
+    description = "根据UUID获取文章详情",
+    get,
+    path = "/api/v1/posts/{uuid}",
+    params(
+        ("uuid" = String, Path, description = "文章UUID")
+    ),
+    responses(
+        (status = 200, description = "成功获取文章详情", body = ApiResponse<PostListResponse>),
+        (status = 404, description = "文章不存在", body = ApiResponse<ValidationErrorJson>),
+        (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)
+    ),
+)]
 pub async fn get_posts_handler(
     db_pool: web::Data<DatabaseConnection>,
     page: web::Path<String>,
@@ -276,6 +304,7 @@ pub async fn get_posts_handler(
 
     Ok(ApiResponse::success(response, "成功").to_http_response())
 }
+
 /// prevNext 或者文章的上一篇跟下一篇
 pub async fn get_prev_next_handler(
     db_pool: web::Data<DatabaseConnection>,
