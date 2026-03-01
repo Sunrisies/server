@@ -1,4 +1,4 @@
-use crate::{HttpResult, config::AppError};
+use crate::{EmptyResponse, HttpResult, config::AppError};
 use actix_web::{HttpResponse, Result, web};
 use chrono::Utc;
 use sea_orm::{ActiveValue::Set, EntityTrait, prelude::*};
@@ -33,7 +33,9 @@ pub async fn create_room_handler(
         .await
         .map_err(|_| AppError::DatabaseError(String::from("检查房间是否存在失败")))?;
     if existing_room.is_some() {
-        return Ok(ApiResponse::<()>::success_msg("房间已存在").to_http_response());
+        return Ok(
+            ApiResponse::<EmptyResponse>::success(EmptyResponse, "房间已存在").to_http_response(),
+        );
     }
     let new_room = rooms::ActiveModel {
         uuid: Set(Uuid::new_v4().to_string()),

@@ -1,3 +1,4 @@
+use crate::EmptyResponse;
 use crate::config::AppError;
 use crate::dto::PaginatedResp;
 use crate::dto::PaginationQuery;
@@ -409,7 +410,24 @@ pub async fn create_post_handler(
     }
 }
 
-/// 更新文章处理器
+// 为更新文章的处理函数添加OpenAPI文档
+#[utoipa::path(
+    summary = "更新文章",
+    tag="文章",
+    description = "根据UUID更新现有文章",
+    put,
+    path = "/api/v1/posts/{uuid}",
+    params(
+        ("uuid" = String, Path, description = "文章UUID")
+    ),
+    request_body = UpdatePostRequest,
+    responses(
+        (status = 200, description = "文章更新成功", body = ApiResponse<PostResponse>),
+        (status = 400, description = "请求参数验证失败", body = ApiResponse<ValidationErrorJson>),
+        (status = 404, description = "文章不存在", body = ApiResponse<ValidationErrorJson>),
+        (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)
+    ),
+)]
 pub async fn update_post_handler(
     db_pool: web::Data<DatabaseConnection>,
     path: web::Path<String>,
@@ -439,7 +457,22 @@ pub async fn update_post_handler(
     }
 }
 
-/// 删除文章处理器
+// 为删除文章的处理函数添加OpenAPI文档
+#[utoipa::path(
+    summary = "删除文章",
+    tag="文章",
+    description = "根据UUID删除文章",
+    delete,
+    path = "/api/v1/posts/{uuid}",
+    params(
+        ("uuid" = String, Path, description = "文章UUID")
+    ),
+    responses(
+        (status = 200, description = "文章删除成功", body = ApiResponse<EmptyResponse>),
+        (status = 404, description = "文章不存在", body = ApiResponse<ValidationErrorJson>),
+        (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)
+    ),
+)]
 pub async fn delete_post_handler(
     db_pool: web::Data<DatabaseConnection>,
     path: web::Path<String>, // 从认证中间件获取用户ID
@@ -450,7 +483,9 @@ pub async fn delete_post_handler(
 
     // 调用服务层删除文章
     match crate::services::posts::PostService::delete_post(db_pool.as_ref(), user_id, &uuid).await {
-        Ok(()) => Ok(ApiResponse::success((), "文章删除成功").to_http_response()),
+        Ok(()) => Ok(
+            ApiResponse::<EmptyResponse>::success(EmptyResponse, "文章删除成功").to_http_response(),
+        ),
         Err(e) => Ok(ApiResponse::from(e).to_http_response()),
     }
 }

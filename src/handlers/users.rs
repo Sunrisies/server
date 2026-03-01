@@ -2,7 +2,7 @@ use crate::config::AppError;
 use crate::dto::PaginationQuery;
 use crate::dto::{PaginatedResp, Pagination};
 use crate::models::users;
-use crate::{ApiResponse, HttpResult, RouteInfo};
+use crate::{ApiResponse, EmptyResponse, HttpResult, RouteInfo};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
 use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait};

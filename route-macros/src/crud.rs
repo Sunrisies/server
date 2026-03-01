@@ -262,7 +262,7 @@ fn generate_read_code(
                 match #get_fn(db.get_ref(), id).await {
                     Ok(data) => Ok(ApiResponse::success(data,"获取成功").to_http_response()),
                     Err(AppError::NotFound(msg)) => {
-                        Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+                        Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse,&msg).to_http_response())
                     },
                     _ => todo!()
                 }
@@ -328,7 +328,7 @@ fn generate_create_code(
             match #create_fn(db.get_ref(), data.into_inner()).await {
                 Ok(category) => Ok(ApiResponse::success(category, "添加成功").to_http_response()),
                 Err(AppError::DatabaseConnectionError(msg)) => {
-                    Ok(ApiResponse::<()>::success_msg(&msg).to_http_response())
+                    Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse,&msg).to_http_response())
                 }
                 Err(e) => {
                     Ok(ApiResponse::from(e).to_http_response())
@@ -361,7 +361,7 @@ fn generate_delete_code(
                 .map_err(|e| AppError::DatabaseError(e.to_string()))?
                 .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))?;
             match entity.delete(db).await {
-                Ok(_res) => Ok(ApiResponse::<()>::success_msg("删除成功").to_http_response()),
+                Ok(_res) => Ok( ApiResponse::<EmptyResponse>::success(EmptyResponse,"删除成功").to_http_response()),
                 Err(e) => {
                     println!("删除失败: {}", e);
                     Ok(

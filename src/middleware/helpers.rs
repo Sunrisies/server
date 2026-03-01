@@ -27,14 +27,6 @@ impl<T: Serialize> ApiResponse<T> {
             data: Some(data),
         }
     }
-    /// 创建成功响应，但无数据
-    pub fn success_msg(message: &str) -> Self {
-        ApiResponse {
-            code: 200,
-            message: message.to_owned(),
-            data: None,
-        }
-    }
 
     ///转换为具有适当状态代码的HTTP响应
     pub fn to_http_response(&self) -> HttpResponse {
@@ -52,6 +44,19 @@ impl<T: Serialize> ApiResponse<T> {
         };
 
         HttpResponse::build(status_code).json(self)
+    }
+}
+/// 空响应数据（用于删除等无返回数据的操作）
+#[derive(Serialize, ToSchema)]
+pub struct EmptyResponse;
+impl ApiResponse<EmptyResponse> {
+    /// 创建成功响应，但无数据
+    pub fn success_msg(message: &str) -> Self {
+        ApiResponse {
+            code: 200,
+            message: message.to_owned(),
+            data: None,
+        }
     }
 }
 

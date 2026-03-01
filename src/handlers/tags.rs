@@ -6,7 +6,7 @@ use crate::dto::user::ValidationErrorJson;
 use crate::dto::{PaginatedResp, Pagination};
 use crate::models::tags::PostWithCategory;
 use crate::models::{categories, post_tags, posts, tags};
-use crate::{ApiResponse, HttpResult, RouteInfo, utils::db_err_map};
+use crate::{ApiResponse, EmptyResponse, HttpResult, RouteInfo, utils::db_err_map};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
 use sea_orm::prelude::Expr;

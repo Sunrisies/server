@@ -5,7 +5,7 @@ use crate::dto::user::ValidationErrorJson;
 use crate::dto::{PaginatedResp, Pagination};
 
 use crate::models::external_links;
-use crate::{ApiResponse, HttpResult, RouteInfo, utils::db_err_map};
+use crate::{ApiResponse, EmptyResponse, HttpResult, RouteInfo, utils::db_err_map};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait};

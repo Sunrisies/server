@@ -3,8 +3,9 @@ use crate::handlers::auth;
 // use crate::handlers::users;
 use crate::handlers::__path_get_users_handler;
 use crate::handlers::posts::{
-    __path_create_post_handler, __path_get_posts_all_handler, __path_get_posts_handler,
-    __path_get_prev_next_handler, __path_get_timeline_handler,
+    __path_create_post_handler, __path_delete_post_handler, __path_get_posts_all_handler,
+    __path_get_posts_handler, __path_get_prev_next_handler, __path_get_timeline_handler,
+    __path_update_post_handler,
 };
 use std::fs::File;
 use std::io::Write;
@@ -31,7 +32,9 @@ use utoipa::OpenApi;
         get_timeline_handler,
         get_posts_handler,
         get_prev_next_handler,
-        create_post_handler
+        create_post_handler,
+        update_post_handler,
+        delete_post_handler
         // crate::handlers::links::list_links_handler,
         // crate::handlers::links::click_link_handler,
         // crate::handlers::links::redirect_link_handler,
