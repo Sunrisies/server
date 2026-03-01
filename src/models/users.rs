@@ -2,7 +2,8 @@ use crate::utils::fmt_beijing;
 use sea_orm::{DeleteResult, entity::prelude::*};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-#[derive(Debug, Clone, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
+use utoipa::ToSchema;
+#[derive(Debug, Clone, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize, ToSchema)]
 #[sea_orm(table_name = "users")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = true)]
@@ -19,9 +20,11 @@ pub struct Model {
     #[sea_orm(unique)]
     pub phone: Option<String>, // 手机号
     pub binding: Option<String>, // authentication绑定
+    #[schema(value_type = String, format = DateTime)]
     #[sea_orm(default_value_t = DateTimeUtc::default())]
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
+    #[schema(value_type = String, format = DateTime)]
     #[sea_orm(default_value_t = DateTimeUtc::default())]
     #[serde(serialize_with = "fmt_beijing")]
     pub updated_at: DateTimeUtc,

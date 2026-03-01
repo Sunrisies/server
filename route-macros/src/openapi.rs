@@ -1,16 +1,24 @@
 use quote::quote;
 use syn::{Ident, LitStr};
 
+use crate::args::OpenApiConfig;
+
 pub struct OpenApiGenerator<'a> {
     pub entity: &'a Ident,
     pub route_prefix: &'a LitStr,
+    pub config: Option<&'a OpenApiConfig>, // 新增：自定义配置
 }
 
 impl<'a> OpenApiGenerator<'a> {
-    pub fn new(entity: &'a Ident, route_prefix: &'a LitStr) -> Self {
+    pub fn new(
+        entity: &'a Ident,
+        route_prefix: &'a LitStr,
+        config: Option<&'a OpenApiConfig>,
+    ) -> Self {
         Self {
             entity,
             route_prefix,
+            config,
         }
     }
 
@@ -37,39 +45,121 @@ impl<'a> OpenApiGenerator<'a> {
     //         )]
     //     }
     // }
+    /// 检查是否应该生成文档
+    pub fn should_generate(&self) -> bool {
+        !self.config.map(|c| c.hidden).unwrap_or(false)
+    }
+    /// 获取摘要（优先使用自定义，否则自动生成）
+    fn get_summary(&self, default: &str) -> String {
+        self.config
+            .and_then(|c| c.summary.clone())
+            .unwrap_or_else(|| default.to_string())
+    }
+    /// 获取描述（优先使用自定义，否则使用默认值）
+    fn get_description(&self, default: &str) -> String {
+        self.config
+            .and_then(|c| c.description.clone())
+            .unwrap_or_else(|| default.to_string())
+    }
 
+    /// 获取标签（优先使用自定义）
+    fn get_tag(&self) -> String {
+        self.config
+            .and_then(|c| c.tag.clone())
+            .or_else(|| Some(self.get_default_tag()))
+            .unwrap()
+    }
+    fn get_default_tag(&self) -> String {
+        match self.entity.to_string().as_str() {
+            "categories" => "分类管理".to_string(),
+            "tags" => "标签管理".to_string(),
+            "users" => "用户管理".to_string(),
+            "external_links" => "外部链接".to_string(),
+            _ => self.entity.to_string(),
+        }
+    }
+
+    /// 获取 deprecated 属性
+    fn get_deprecated_attr(&self) -> proc_macro2::TokenStream {
+        let is_deprecated = self.config.map(|c| c.deprecated).unwrap_or(false);
+        if is_deprecated {
+            quote! { , deprecated }
+        } else {
+            quote! {}
+        }
+    }
+    /// 生成读取单条记录的文档（标准版 - 按ID查询）
     pub fn generate_read_doc(&self, id_type: &str) -> proc_macro2::TokenStream {
+        if !self.should_generate() {
+            return quote! {};
+        }
+
         let entity_str = self.entity.to_string();
-        let tag = self.get_primary_tag();
+        let entity = self.entity; // 将 self.entity 绑定到局部变量
+        let summary = self.get_summary(&format!("获取{}详情", entity_str));
+        let description = self.get_description(&format!("根据ID获取单个{}的详细信息", entity_str));
+        let tag = self.get_tag();
         let route_path = format!("{}/{{id}}", self.route_prefix.value());
         let id_description = match id_type {
             "uuid" => "UUID 标识符",
             _ => "数字 ID",
         };
-        // println!("route_path: {}", route_path);
-        // println!("id_description: {}", id_description);
-        // println!("生成的 OpenAPI 文档: {}, id_type:{}", entity_str, id_type);
+        let deprecated_attr = self.get_deprecated_attr();
+
         quote! {
             #[utoipa::path(
                 get,
-                summary = format!("获取{}详情", #entity_str),
                 path = #route_path,
                 tag = #tag,
+                summary = #summary,
+                description = #description #deprecated_attr,
                 params(
                     ("id" = String, Path, description = #id_description)
                 ),
                 responses(
-                    // (status = 200, description = "获取成功", body = ApiResponse<#entity::Model>),
-                    // (status = 404, description = format!("{}不存在", #entity_str), body = ApiResponse<()>),
-                    // (status = 500, description = "服务器内部错误", body = ApiResponse<()>)
+                    (status = 200, description = "获取成功", body = crate::ApiResponse<#entity::Model>),
+                    (status = 404, description = concat!(#entity_str, "不存在"), body = crate::ApiResponse<crate::EmptyResponse>),
+                    (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
                 ),
                 security(
                     ("bearer_auth" = [])
                 )
             )]
-
         }
     }
+
+    // pub fn generate_read_doc(&self, id_type: &str) -> proc_macro2::TokenStream {
+    //     let entity_str = self.entity.to_string();
+    //     let tag = self.get_primary_tag();
+    //     let route_path = format!("{}/{{id}}", self.route_prefix.value());
+    //     let id_description = match id_type {
+    //         "uuid" => "UUID 标识符",
+    //         _ => "数字 ID",
+    //     };
+    //     // println!("route_path: {}", route_path);
+    //     // println!("id_description: {}", id_description);
+    //     // println!("生成的 OpenAPI 文档: {}, id_type:{}", entity_str, id_type);
+    //     quote! {
+    //         #[utoipa::path(
+    //             get,
+    //             summary = format!("获取{}详情", #entity_str),
+    //             path = #route_path,
+    //             tag = #tag,
+    //             params(
+    //                 ("id" = String, Path, description = #id_description)
+    //             ),
+    //             responses(
+    //                 // (status = 200, description = "获取成功", body = ApiResponse<#entity::Model>),
+    //                 // (status = 404, description = format!("{}不存在", #entity_str), body = ApiResponse<()>),
+    //                 // (status = 500, description = "服务器内部错误", body = ApiResponse<()>)
+    //             ),
+    //             security(
+    //                 ("bearer_auth" = [])
+    //             )
+    //         )]
+
+    //     }
+    // }
 
     // pub fn generate_list_doc(&self) -> proc_macro2::TokenStream {
     //     let entity_str = self.entity.to_string();

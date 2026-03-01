@@ -3,8 +3,9 @@
 use crate::{impl_entity_unique_check, utils::fmt_beijing};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
 #[sea_orm(table_name = "external_links")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -22,9 +23,10 @@ pub struct Model {
     pub category: String,
     #[sea_orm(column_type = "JsonBinary")]
     pub tags: Json,
+    #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
-
+    #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub updated_at: DateTimeUtc,
 }

@@ -186,7 +186,7 @@ pub async fn get_posts_all_handler(
     tag="文章",
     description = "根据文章的创建时间返回时间轴",
     get,
-    path = "/api/v1/timeline",
+    path = "/api/v1/posts/uploadTime",
     responses(
         (status = 200, description = "成功获取文章时间轴", body = ApiResponse<Vec<TimelineResponse>>),
         (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)

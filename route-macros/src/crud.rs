@@ -43,7 +43,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     let mod_name = format_ident!("{}_routes", entity.to_string().to_lowercase());
 
     // 创建 OpenAPI 生成器
-    let openapi_gen = OpenApiGenerator::new(entity, route_prefix);
+    let openapi_gen = OpenApiGenerator::new(entity, route_prefix, config.openapi_read.as_ref());
 
     let mut create_code = quote! {};
     let mut read_code = quote! {};

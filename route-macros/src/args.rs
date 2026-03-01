@@ -3,6 +3,15 @@ use syn::{
     parse::{Parse, ParseStream},
     token::Comma,
 };
+
+#[derive(Debug, PartialEq)]
+pub struct OpenApiConfig {
+    pub summary: Option<String>,     // 自定义摘要
+    pub description: Option<String>, // 自定义描述
+    pub tag: Option<String>,         // 自定义标签
+    pub deprecated: bool,            // 是否废弃
+    pub hidden: bool,                // 是否隐藏
+}
 /// 自定义查询参数
 #[derive(Debug, PartialEq)]
 pub enum CustomQueryType {
@@ -39,6 +48,8 @@ pub struct CrudEntityConfig {
     pub custom_queries: Option<Vec<CustomQueryType>>, // 新增：自定义查询类型
     pub custom_list_fn: Option<Ident>,                // 新增：自定义列表查询函数名
     pub custom_read_fn: Option<Ident>,                // 新增：自定义详情查询函数名
+    // OpenAPI 配置
+    pub openapi_read: Option<OpenApiConfig>,
 }
 
 impl Parse for CrudEntityConfig {
@@ -54,7 +65,7 @@ impl Parse for CrudEntityConfig {
         let mut custom_queries = None;
         let mut custom_list_fn = None;
         let mut custom_read_fn = None;
-
+        let mut openapi_read = None;
         while !content.is_empty() {
             let key: Ident = content.parse()?;
             content.parse::<Token![:]>()?;
@@ -137,6 +148,10 @@ impl Parse for CrudEntityConfig {
                     let value: Ident = content.parse()?;
                     custom_read_fn = Some(value);
                 }
+                "openapi_read" => {
+                    let config = parse_openapi_config(&&content)?;
+                    openapi_read = Some(config);
+                }
                 _ => {
                     return Err(syn::Error::new_spanned(key, "Unknown field"));
                 }
@@ -159,6 +174,7 @@ impl Parse for CrudEntityConfig {
             custom_queries,
             custom_list_fn,
             custom_read_fn,
+            openapi_read,
         })
     }
 }
@@ -213,4 +229,56 @@ impl Parse for RoutePermissionArgs {
                 .ok_or_else(|| input.error("permission attribute is required"))?,
         })
     }
+}
+
+fn parse_openapi_config(input: &ParseStream) -> syn::Result<OpenApiConfig> {
+    let content;
+    syn::braced!(content in input);
+
+    let mut summary = None;
+    let mut description = None;
+    let mut tag = None;
+    let mut deprecated = false;
+    let mut hidden = false;
+
+    while !content.is_empty() {
+        let key: Ident = content.parse()?;
+        content.parse::<Token![:]>()?;
+
+        match key.to_string().as_str() {
+            "summary" => {
+                let value: LitStr = content.parse()?;
+                summary = Some(value.value());
+            }
+            "description" => {
+                let value: LitStr = content.parse()?;
+                description = Some(value.value());
+            }
+            "tag" => {
+                let value: LitStr = content.parse()?;
+                tag = Some(value.value());
+            }
+            "deprecated" => {
+                let value: syn::LitBool = content.parse()?;
+                deprecated = value.value();
+            }
+            "hidden" => {
+                let value: syn::LitBool = content.parse()?;
+                hidden = value.value();
+            }
+            _ => return Err(syn::Error::new_spanned(key, "Unknown openapi config field")),
+        }
+
+        if content.peek(Token![,]) {
+            content.parse::<Token![,]>()?;
+        }
+    }
+
+    Ok(OpenApiConfig {
+        summary,
+        description,
+        tag,
+        deprecated,
+        hidden,
+    })
 }
