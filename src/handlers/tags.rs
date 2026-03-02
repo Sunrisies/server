@@ -17,7 +17,7 @@ use sea_orm::{
 
 crud_entity!({
     entity : tags,
-    route_prefix:"/api/tags",
+    route_prefix:"/api/v1/tags",
     permission_prefix: "tags",
     id_type:"id",
     operations: ["create","list","delete","read"],

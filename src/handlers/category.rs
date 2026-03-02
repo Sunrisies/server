@@ -11,7 +11,7 @@ use route_macros::crud_entity;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait};
 crud_entity!({
     entity : categories,
-    route_prefix:"/api/categories",
+    route_prefix:"/api/v1/categories",
     permission_prefix: "categories",
     id_type:"id",
     operations: ["create","list","delete","read"],
