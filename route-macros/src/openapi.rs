@@ -128,6 +128,42 @@ impl<'a> OpenApiGenerator<'a> {
         }
     }
 
+    /// 生成列表查询的文档
+    pub fn generate_list_doc(&self) -> proc_macro2::TokenStream {
+        if !self.should_generate() {
+            return quote! {};
+        }
+
+        let entity_str = self.entity.to_string();
+        let entity = self.entity;
+        let summary = self.get_summary(&format!("获取{}列表", entity_str));
+        let description = self.get_description(&format!("分页获取{}列表", entity_str));
+        let tag = self.get_tag();
+        let route_path = self.route_prefix.value();
+        let deprecated_attr = self.get_deprecated_attr();
+
+        quote! {
+            #[utoipa::path(
+                get,
+                path = #route_path,
+                tag = #tag,
+                summary = #summary,
+                description = #description #deprecated_attr,
+                params(
+                    ("page" = Option<u64>, Query, description = "页码，从1开始，默认1",example=1),
+                    ("limit" = Option<u64>, Query, description = "每页数量，默认10",example=10)
+                ),
+                responses(
+                    (status = 200, description = "获取成功", body = crate::ApiResponse<PaginatedResp<#entity::Model>>),
+                    (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+                ),
+                security(
+                    ("bearer_auth" = [])
+                )
+            )]
+        }
+    }
+
     // pub fn generate_read_doc(&self, id_type: &str) -> proc_macro2::TokenStream {
     //     let entity_str = self.entity.to_string();
     //     let tag = self.get_primary_tag();

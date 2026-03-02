@@ -111,6 +111,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     entity,
                     route_prefix,
                     permission_prefix,
+                    &openapi_gen,
                     // use_custom_list,
                     // &custom_list_fn,
                 );
@@ -391,13 +392,16 @@ fn generate_list_code(
     entity: &Ident,
     route_prefix: &LitStr,
     permission_prefix: &LitStr,
+    openapi_gen: &OpenApiGenerator,
 ) -> proc_macro2::TokenStream {
     let get_fn = format_ident!("get_{}_all", entity.to_string().to_lowercase());
     let get_handler = format_ident!("get_{}_all_handler", entity.to_string().to_lowercase());
     let full_path = format!("{}", route_prefix.value());
     let full_permission = format!("get::{}:read::list", permission_prefix.value());
+    let openapi_doc = openapi_gen.generate_list_doc();
 
     quote! {
+        #openapi_doc
         pub async fn #get_fn(
             db_pool: &DatabaseConnection,
             page: u64,
