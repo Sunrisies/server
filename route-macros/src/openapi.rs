@@ -171,6 +171,46 @@ impl<'a> OpenApiGenerator<'a> {
         }
     }
 
+    /// 生成删除文档
+    pub fn generate_delete_doc(&self, id_type: &str) -> proc_macro2::TokenStream {
+        if !self.should_generate() {
+            return quote! {};
+        }
+
+        let entity_str = self.entity.to_string();
+        let summary = self.get_summary(&format!("删除{}", self.openapi_summary.value()));
+        let description = self
+            .config
+            .and_then(|c| c.description.clone())
+            .unwrap_or_else(|| format!("根据ID删除指定的{}", self.openapi_summary.value()));
+        let tag = self.get_tag();
+        let route_path = format!("{}/{{id}}", self.route_prefix.value());
+        let id_description = match id_type {
+            "uuid" => "UUID 标识符",
+            _ => "数字 ID",
+        };
+
+        quote! {
+            #[utoipa::path(
+                delete,
+                path = #route_path,
+                tag = #tag,
+                summary = #summary,
+                description = #description,
+                params(
+                    ("id" = String, Path, description = #id_description)
+                ),
+                responses(
+                    (status = 200, description = "删除成功", body = crate::ApiResponse<crate::EmptyResponse>),
+                    (status = 404, description = concat!(#entity_str, "不存在"), body = crate::ApiResponse<crate::EmptyResponse>),
+                    (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+                ),
+                security(
+                    ("bearer_auth" = [])
+                )
+            )]
+        }
+    }
     // pub fn generate_read_doc(&self, id_type: &str) -> proc_macro2::TokenStream {
     //     let entity_str = self.entity.to_string();
     //     let tag = self.get_primary_tag();

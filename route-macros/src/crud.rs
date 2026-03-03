@@ -103,6 +103,12 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                 ));
             }
             CrudOperation::Delete => {
+                let openapi_gen = OpenApiGenerator::new(
+                    entity,
+                    route_prefix,
+                    &openapi_summary,
+                    config.openapi_delete.as_ref(),
+                );
                 delete_code = generate_delete_code(
                     entity,
                     route_prefix,
@@ -110,6 +116,8 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     &path_param_type,
                     &fn_arg,
                     &call_expr,
+                    &openapi_gen,
+                    id_type_str,
                 );
                 operation_logs.push(format!(
                     "删除操作: delete_{}_handler",
@@ -362,11 +370,14 @@ fn generate_delete_code(
     path_param_type: &proc_macro2::TokenStream,
     fn_arg: &proc_macro2::TokenStream,
     call_expr: &proc_macro2::TokenStream,
+    openapi_gen: &OpenApiGenerator,
+    id_type_str: &str,
 ) -> proc_macro2::TokenStream {
     let delete_fn = format_ident!("delete_{}", entity.to_string().to_lowercase());
     let delete_handler = format_ident!("delete_{}_handler", entity.to_string().to_lowercase());
     let full_path = format!("{}/{{id}}", route_prefix.value());
     let full_permission = format!("{}:delete:id", permission_prefix.value());
+    let openapi_doc: proc_macro2::TokenStream = openapi_gen.generate_delete_doc(id_type_str);
 
     quote! {
         pub async fn #delete_fn(
@@ -388,7 +399,7 @@ fn generate_delete_code(
                 }
             }
         }
-
+        #openapi_doc
         #[crate::route_permission(
             path = #full_path,
             method = "delete",

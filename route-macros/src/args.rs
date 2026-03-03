@@ -52,6 +52,7 @@ pub struct CrudEntityConfig {
     pub openapi_summary: Option<LitStr>, // 自定义摘要
     pub openapi_read: Option<OpenApiConfig>,
     pub openapi_list: Option<OpenApiConfig>,
+    pub openapi_delete: Option<OpenApiConfig>,
 }
 
 impl Parse for CrudEntityConfig {
@@ -70,6 +71,7 @@ impl Parse for CrudEntityConfig {
         let mut openapi_summary = None;
         let mut openapi_read = None;
         let mut openapi_list = None;
+        let mut openapi_delete = None;
         while !content.is_empty() {
             let key: Ident = content.parse()?;
             content.parse::<Token![:]>()?;
@@ -164,6 +166,10 @@ impl Parse for CrudEntityConfig {
                     let config = parse_openapi_config(&&content)?;
                     openapi_list = Some(config);
                 }
+                "openapi_delete" => {
+                    let config = parse_openapi_config(&&content)?;
+                    openapi_delete = Some(config);
+                }
                 _ => {
                     return Err(syn::Error::new_spanned(key, "Unknown field"));
                 }
@@ -189,6 +195,7 @@ impl Parse for CrudEntityConfig {
             openapi_summary,
             openapi_read,
             openapi_list,
+            openapi_delete,
         })
     }
 }
