@@ -16,6 +16,7 @@ crud_entity!({
     id_type:"id",
     operations: ["create","list","delete","read"],
     create_request_type: CreateCategoryRequest,
+    openapi_summary: "分类",
 });
 
 // /// 创建分类

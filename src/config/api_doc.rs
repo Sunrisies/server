@@ -2,15 +2,18 @@ use crate::handlers::auth;
 // use crate::handlers::category;
 // use crate::handlers::users;
 use crate::handlers::__path_get_users_handler;
-use crate::handlers::category::categories_routes::__path_get_categories_handler;
-use crate::handlers::links::external_links_routes::__path_get_external_links_all;
-use crate::handlers::links::external_links_routes::__path_get_external_links_handler;
+use crate::handlers::category::categories_routes::{
+    __path_get_categories_all, __path_get_categories_handler,
+};
+use crate::handlers::links::external_links_routes::{
+    __path_get_external_links_all, __path_get_external_links_handler,
+};
 use crate::handlers::posts::{
     __path_create_post_handler, __path_delete_post_handler, __path_get_posts_all_handler,
     __path_get_posts_handler, __path_get_prev_next_handler, __path_get_timeline_handler,
     __path_update_post_handler,
 };
-use crate::handlers::tags::tags_routes::__path_get_tags_handler;
+use crate::handlers::tags::tags_routes::{__path_get_tags_all, __path_get_tags_handler};
 use std::fs::File;
 use std::io::Write;
 use utoipa::OpenApi;
@@ -42,7 +45,9 @@ use utoipa::OpenApi;
         get_external_links_handler,
         get_categories_handler,
         get_tags_handler,
-        get_external_links_all
+        get_external_links_all,
+        get_categories_all,
+        get_tags_all,
         // get_external_links_all_handler
         // crate::handlers::links::list_links_handler,
         // crate::handlers::links::click_link_handler,

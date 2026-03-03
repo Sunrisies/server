@@ -24,6 +24,12 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             CrudOperation::List,
         ]
     });
+    let openapi_summary = config.openapi_summary.unwrap_or_else(|| {
+        LitStr::new(
+            &format!("{} CRUD operations", entity.to_string().to_uppercase()),
+            entity.span(),
+        )
+    });
 
     let (fn_arg, call_expr, path_param_type, id_type_str) = match id_type {
         IdType::Uuid => (
@@ -41,9 +47,6 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     };
 
     let mod_name = format_ident!("{}_routes", entity.to_string().to_lowercase());
-
-    // 创建 OpenAPI 生成器
-    let openapi_gen = OpenApiGenerator::new(entity, route_prefix, config.openapi_read.as_ref());
 
     let mut create_code = quote! {};
     let mut read_code = quote! {};
@@ -75,6 +78,13 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                 ));
             }
             CrudOperation::Read => {
+                // 创建 OpenAPI 生成器
+                let openapi_gen = OpenApiGenerator::new(
+                    entity,
+                    route_prefix,
+                    &openapi_summary,
+                    config.openapi_read.as_ref(),
+                );
                 read_code = generate_read_code(
                     entity,
                     route_prefix,
@@ -107,6 +117,12 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                 ));
             }
             CrudOperation::List => {
+                let openapi_gen = OpenApiGenerator::new(
+                    entity,
+                    route_prefix,
+                    &openapi_summary,
+                    config.openapi_list.as_ref(),
+                );
                 list_code = generate_list_code(
                     entity,
                     route_prefix,

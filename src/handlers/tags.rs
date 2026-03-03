@@ -21,7 +21,9 @@ crud_entity!({
     permission_prefix: "tags",
     id_type:"id",
     operations: ["create","list","delete","read"],
-    create_request_type: CreateTagRequest
+    create_request_type: CreateTagRequest,
+    openapi_summary: "标签",
+
 });
 
 pub async fn get_tags_with_count_handler(db_pool: web::Data<DatabaseConnection>) -> HttpResult {

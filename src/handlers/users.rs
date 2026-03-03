@@ -12,6 +12,7 @@ crud_entity!({
     route_prefix:"/api/v1/users",
     permission_prefix: "users",
     id_type:"uuid",
+    openapi_summary: "用户",
     operations: ["list","read"],
 });
 

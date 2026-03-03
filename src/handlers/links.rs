@@ -16,7 +16,8 @@ crud_entity!({
     id_type:"id",
     operations: ["create","list","delete","read"],
     create_request_type: CreateLinkRequest,
-      openapi_read: {
+    openapi_summary:"链接管理",
+    openapi_read: {
         summary: "获取链接详情",
         description: "根据ID获取单个外部链接的详细信息"
     }

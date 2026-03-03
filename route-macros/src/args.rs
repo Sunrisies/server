@@ -49,7 +49,9 @@ pub struct CrudEntityConfig {
     pub custom_list_fn: Option<Ident>,                // 新增：自定义列表查询函数名
     pub custom_read_fn: Option<Ident>,                // 新增：自定义详情查询函数名
     // OpenAPI 配置
+    pub openapi_summary: Option<LitStr>, // 自定义摘要
     pub openapi_read: Option<OpenApiConfig>,
+    pub openapi_list: Option<OpenApiConfig>,
 }
 
 impl Parse for CrudEntityConfig {
@@ -65,7 +67,9 @@ impl Parse for CrudEntityConfig {
         let mut custom_queries = None;
         let mut custom_list_fn = None;
         let mut custom_read_fn = None;
+        let mut openapi_summary = None;
         let mut openapi_read = None;
+        let mut openapi_list = None;
         while !content.is_empty() {
             let key: Ident = content.parse()?;
             content.parse::<Token![:]>()?;
@@ -148,9 +152,17 @@ impl Parse for CrudEntityConfig {
                     let value: Ident = content.parse()?;
                     custom_read_fn = Some(value);
                 }
+                "openapi_summary" => {
+                    let value: LitStr = content.parse()?;
+                    openapi_summary = Some(value);
+                }
                 "openapi_read" => {
                     let config = parse_openapi_config(&&content)?;
                     openapi_read = Some(config);
+                }
+                "openapi_list" => {
+                    let config = parse_openapi_config(&&content)?;
+                    openapi_list = Some(config);
                 }
                 _ => {
                     return Err(syn::Error::new_spanned(key, "Unknown field"));
@@ -174,7 +186,9 @@ impl Parse for CrudEntityConfig {
             custom_queries,
             custom_list_fn,
             custom_read_fn,
+            openapi_summary,
             openapi_read,
+            openapi_list,
         })
     }
 }

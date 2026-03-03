@@ -6,6 +6,7 @@ use crate::args::OpenApiConfig;
 pub struct OpenApiGenerator<'a> {
     pub entity: &'a Ident,
     pub route_prefix: &'a LitStr,
+    pub openapi_summary: &'a LitStr,
     pub config: Option<&'a OpenApiConfig>, // 新增：自定义配置
 }
 
@@ -13,11 +14,13 @@ impl<'a> OpenApiGenerator<'a> {
     pub fn new(
         entity: &'a Ident,
         route_prefix: &'a LitStr,
+        openapi_summary: &'a LitStr,
         config: Option<&'a OpenApiConfig>,
     ) -> Self {
         Self {
             entity,
             route_prefix,
+            openapi_summary,
             config,
         }
     }
@@ -96,8 +99,11 @@ impl<'a> OpenApiGenerator<'a> {
 
         let entity_str = self.entity.to_string();
         let entity = self.entity; // 将 self.entity 绑定到局部变量
-        let summary = self.get_summary(&format!("获取{}详情", entity_str));
-        let description = self.get_description(&format!("根据ID获取单个{}的详细信息", entity_str));
+        let summary = self.get_summary(&format!("获取{}详情", self.openapi_summary.value()));
+        let description = self.get_description(&format!(
+            "根据ID获取单个{}的详细信息",
+            self.openapi_summary.value()
+        ));
         let tag = self.get_tag();
         let route_path = format!("{}/{{id}}", self.route_prefix.value());
         let id_description = match id_type {
@@ -136,8 +142,9 @@ impl<'a> OpenApiGenerator<'a> {
 
         let entity_str = self.entity.to_string();
         let entity = self.entity;
-        let summary = self.get_summary(&format!("获取{}列表", entity_str));
-        let description = self.get_description(&format!("分页获取{}列表", entity_str));
+        let summary = self.get_summary(&format!("获取{}列表", self.openapi_summary.value()));
+        let description =
+            self.get_description(&format!("分页获取{}列表", self.openapi_summary.value()));
         let tag = self.get_tag();
         let route_path = self.route_prefix.value();
         let deprecated_attr = self.get_deprecated_attr();
