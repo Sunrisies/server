@@ -211,95 +211,6 @@ impl<'a> OpenApiGenerator<'a> {
             )]
         }
     }
-    // pub fn generate_read_doc(&self, id_type: &str) -> proc_macro2::TokenStream {
-    //     let entity_str = self.entity.to_string();
-    //     let tag = self.get_primary_tag();
-    //     let route_path = format!("{}/{{id}}", self.route_prefix.value());
-    //     let id_description = match id_type {
-    //         "uuid" => "UUID 标识符",
-    //         _ => "数字 ID",
-    //     };
-    //     // println!("route_path: {}", route_path);
-    //     // println!("id_description: {}", id_description);
-    //     // println!("生成的 OpenAPI 文档: {}, id_type:{}", entity_str, id_type);
-    //     quote! {
-    //         #[utoipa::path(
-    //             get,
-    //             summary = format!("获取{}详情", #entity_str),
-    //             path = #route_path,
-    //             tag = #tag,
-    //             params(
-    //                 ("id" = String, Path, description = #id_description)
-    //             ),
-    //             responses(
-    //                 // (status = 200, description = "获取成功", body = ApiResponse<#entity::Model>),
-    //                 // (status = 404, description = format!("{}不存在", #entity_str), body = ApiResponse<()>),
-    //                 // (status = 500, description = "服务器内部错误", body = ApiResponse<()>)
-    //             ),
-    //             security(
-    //                 ("bearer_auth" = [])
-    //             )
-    //         )]
-
-    //     }
-    // }
-
-    // pub fn generate_list_doc(&self) -> proc_macro2::TokenStream {
-    //     let entity_str = self.entity.to_string();
-    //     let tag = self.get_primary_tag();
-    //     let route_path = self.route_prefix.value();
-    //     let list_entity = format_ident!("{}List", self.entity);
-
-    //     quote! {
-    //         #[utoipa::path(
-    //             get,
-    //             summary = format!("获取{}列表", #entity_str),
-    //             path = #route_path,
-    //             tag = #tag,
-    //             params(
-    //                 ("page" = Option<u64>, Query, description = "页码，从1开始"),
-    //                 ("limit" = Option<u64>, Query, description = "每页数量")
-    //             ),
-    //             responses(
-    //                 (status = 200, description = "获取成功", body = ApiResponse<Vec<#entity::Model>>),
-    //                 (status = 500, description = "服务器内部错误", body = ApiResponse<()>)
-    //             ),
-    //             security(
-    //                 ("bearer_auth" = [])
-    //             )
-    //         )]
-    //     }
-    // }
-
-    // pub fn generate_delete_doc(&self, id_type: &str) -> proc_macro2::TokenStream {
-    //     let entity_str = self.entity.to_string();
-    //     let tag = self.get_primary_tag();
-    //     let route_path = format!("{}/{{id}}", self.route_prefix.value());
-    //     let id_description = match id_type {
-    //         "uuid" => "UUID 标识符",
-    //         _ => "数字 ID",
-    //     };
-
-    //     quote! {
-    //         #[utoipa::path(
-    //             delete,
-    //             summary = format!("删除{}", #entity_str),
-    //             path = #route_path,
-    //             tag = #tag,
-    //             params(
-    //                 ("id" = String, Path, description = #id_description)
-    //             ),
-    //             responses(
-    //                 (status = 200, description = "删除成功", body = ApiResponse<()>),
-    //                 (status = 404, description = format!("{}不存在", #entity_str), body = ApiResponse<()>),
-    //                 (status = 500, description = "服务器内部错误", body = ApiResponse<()>)
-    //             ),
-    //             security(
-    //                 ("bearer_auth" = [])
-    //             )
-    //         )]
-    //     }
-    // }
 
     fn get_primary_tag(&self) -> String {
         // if let Some(tags) = self.tags {
@@ -316,12 +227,4 @@ impl<'a> OpenApiGenerator<'a> {
             _ => self.entity.to_string(),
         }
     }
-
-    // pub fn get_all_tags(&self) -> Vec<String> {
-    //     if let Some(tags) = self.tags {
-    //         tags.iter().map(|lit| lit.value()).collect()
-    //     } else {
-    //         vec![self.get_primary_tag()]
-    //     }
-    // }
 }

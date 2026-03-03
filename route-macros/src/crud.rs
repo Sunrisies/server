@@ -377,7 +377,7 @@ fn generate_delete_code(
     let delete_handler = format_ident!("delete_{}_handler", entity.to_string().to_lowercase());
     let full_path = format!("{}/{{id}}", route_prefix.value());
     let full_permission = format!("{}:delete:id", permission_prefix.value());
-    let openapi_doc: proc_macro2::TokenStream = openapi_gen.generate_delete_doc(id_type_str);
+    let openapi_doc = openapi_gen.generate_delete_doc(id_type_str);
 
     quote! {
         pub async fn #delete_fn(
