@@ -140,7 +140,6 @@ impl<'a> OpenApiGenerator<'a> {
             return quote! {};
         }
 
-        let entity_str = self.entity.to_string();
         let entity = self.entity;
         let summary = self.get_summary(&format!("获取{}列表", self.openapi_summary.value()));
         let description =
@@ -209,22 +208,6 @@ impl<'a> OpenApiGenerator<'a> {
                     ("bearer_auth" = [])
                 )
             )]
-        }
-    }
-
-    fn get_primary_tag(&self) -> String {
-        // if let Some(tags) = self.tags {
-        //     if let Some(first_tag) = tags.first() {
-        //         return first_tag.value();
-        //     }
-        // }
-
-        // 默认使用实体名的中文翻译
-        match self.entity.to_string().as_str() {
-            "categories" => "分类".to_string(),
-            "tags" => "标签".to_string(),
-            "users" => "用户".to_string(),
-            _ => self.entity.to_string(),
         }
     }
 }

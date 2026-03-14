@@ -15,5 +15,6 @@ pub mod posts;
 #[cfg(test)]
 mod posts_test;
 
+pub mod images;
 pub mod upload;
 pub use email::{EmailService, EmailVerificationManager};

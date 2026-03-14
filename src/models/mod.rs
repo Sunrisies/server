@@ -4,6 +4,7 @@ pub mod prelude;
 
 pub mod categories;
 pub mod external_links;
+pub mod images;
 pub mod permissions;
 pub mod post_tags;
 pub mod posts;
