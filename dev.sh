@@ -268,18 +268,30 @@ build_rust_project() {
   if command -v cargo &> /dev/null; then
     cargo build --release
     check_success "Rust 项目构建"
-
+    TARGET_DIR=$(get_target_dir)
     # 检查生成的可执行文件
-    if [ -f "target/release/$PROJECT_NAME" ]; then
+    if [ -f $TARGET_DIR/release/$PROJECT_NAME ]; then
       log_success "Rust 项目构建成功，可执行文件大小: $(du -h target/release/$PROJECT_NAME | cut -f1)"
     else
-      log_error "未找到构建的可执行文件: target/release/$PROJECT_NAME"
+      log_error "未找到构建的可执行文件: $TARGET_DIR"
       return 1
     fi
   else
     log_error "未找到 cargo 命令"
     return 1
   fi
+}
+
+get_target_dir() {
+  # 优先使用环境变量
+  [ -n "$CARGO_TARGET_DIR" ] && echo "$CARGO_TARGET_DIR" && return
+
+  # 其次使用 cargo metadata 获取实际路径
+  local target_dir=$(cargo metadata --format-version=1 2>/dev/null | grep -o '"target_directory":"[^"]*"' | cut -d '"' -f4)
+  [ -n "$target_dir" ] && echo "$target_dir" && return
+
+  # 最后回退到默认值
+  echo "./target"
 }
 
 # 使用 Docker 构建项目
