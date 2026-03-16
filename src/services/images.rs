@@ -1,5 +1,6 @@
 use crate::config::manager::CONFIG;
 use crate::dto::common::PaginationQuery;
+use crate::dto::image::ImageUploadResponse;
 // use crate::dto::image::ImageUploadResponse;
 use crate::utils::file_size::FileSize;
 use crate::{ApiResponse, HttpResult, config::AppError};
@@ -78,17 +79,18 @@ impl ImageService {
                 // 保存图片信息到数据库
                 // let image_record = Self::save_image_to_db(db, &upload_result).await?;
 
-                // let response = ImageUploadResponse {
-                //     id: image_record.id,
-                //     url: upload_result.url,
-                //     key: upload_result.key,
-                //     filename: upload_result.filename,
-                //     size: upload_result.size,
-                //     human_readable_size: upload_result.human_readable_size,
-                //     created_at: image_record.created_at.to_rfc3339(),
-                // };
+                let response = ImageUploadResponse {
+                    // id: image_record.id,
+                    id: 12,
+                    url: upload_result.url,
+                    key: upload_result.key,
+                    filename: upload_result.filename,
+                    size: upload_result.size,
+                    human_readable_size: upload_result.human_readable_size,
+                    created_at: "image_record.created_at.to_rfc3339()".to_string(),
+                };
 
-                Ok(ApiResponse::success("response", "图片上传成功").to_http_response())
+                Ok(ApiResponse::success(response, "图片上传成功").to_http_response())
             }
             Err(e) => {
                 // 清理临时文件
@@ -315,6 +317,7 @@ impl ImageService {
         original_filename: &str,
         file_size: u64,
     ) -> AnyhowResult<UploadResult> {
+        log::info!("开始上传文件到七牛云{:?}", &CONFIG.qi_niu);
         let credential = Credential::new(&CONFIG.qi_niu.access_key, &CONFIG.qi_niu.secret_key);
         let upload_manager =
             QiNiuUploadManager::builder(UploadTokenSigner::new_credential_provider(
@@ -346,11 +349,11 @@ impl ImageService {
             .context("无法从上传响应中获取密钥")?
             .to_string();
 
-        // let final_url = Self::build_final_url(&key);
+        let final_url = Self::build_final_url(&key);
         let human_readable_size = FileSize::from(file_size).to_string();
 
         Ok(UploadResult {
-            url: "final_url".to_string(),
+            url: final_url,
             key,
             filename: original_filename.to_string(),
             size: file_size,
@@ -387,13 +390,13 @@ impl ImageService {
     }
 
     // 构建最终 URL
-    // fn build_final_url(&self, key: &str) -> String {
-    //     if self.config.domain_url.ends_with('/') {
-    //         format!("{}{}", self.config.domain_url, key)
-    //     } else {
-    //         format!("{}/{}", self.config.domain_url, key)
-    //     }
-    // }
+    fn build_final_url(key: &str) -> String {
+        if CONFIG.qi_niu.domain_url.ends_with('/') {
+            format!("{}{}", CONFIG.qi_niu.domain_url, key)
+        } else {
+            format!("{}/{}", CONFIG.qi_niu.domain_url, key)
+        }
+    }
 
     // 保存图片信息到数据库
     // async fn save_image_to_db(

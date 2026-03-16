@@ -66,6 +66,7 @@ where
             "/api/v1/email",
             "/api/v1/version",
             "/api/v1/links",
+            "/api/v1/images",
         ];
         let is_public = exact_paths.contains(&path.as_str())
             || prefix_paths.iter().any(|&prefix| path.starts_with(prefix));
