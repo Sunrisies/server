@@ -1,3 +1,5 @@
+use crate::utils::fmt_beijing;
+use sea_orm::prelude::DateTimeUtc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -13,9 +15,10 @@ pub struct ImageUploadResponse {
     pub url: String,
     pub key: String,
     pub filename: String,
-    pub size: u64,
+    pub size: i64,
     pub human_readable_size: String,
-    pub created_at: String,
+    #[serde(serialize_with = "fmt_beijing")]
+    pub created_at: DateTimeUtc,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

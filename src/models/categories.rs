@@ -15,7 +15,6 @@ pub struct Model {
     #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
-
     #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub updated_at: DateTimeUtc,

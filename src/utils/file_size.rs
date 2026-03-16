@@ -2,7 +2,7 @@ use std::fmt;
 
 // 文件大小格式化器
 #[derive(Debug, Clone)]
-pub struct FileSize(pub u64);
+pub struct FileSize(pub i64);
 
 impl fmt::Display for FileSize {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -23,8 +23,14 @@ impl fmt::Display for FileSize {
     }
 }
 
+impl From<i64> for FileSize {
+    fn from(size: i64) -> Self {
+        FileSize(size)
+    }
+}
+
 impl From<u64> for FileSize {
     fn from(size: u64) -> Self {
-        FileSize(size)
+        FileSize(size as i64)
     }
 }

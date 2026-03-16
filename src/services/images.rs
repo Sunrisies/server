@@ -1,12 +1,13 @@
 use crate::config::manager::CONFIG;
 use crate::dto::common::PaginationQuery;
 use crate::dto::image::ImageUploadResponse;
+use crate::models::images;
 // use crate::dto::image::ImageUploadResponse;
 use crate::utils::file_size::FileSize;
 use crate::{ApiResponse, HttpResult, config::AppError};
 use actix_multipart::Multipart;
 use anyhow::{Context, Result as AnyhowResult};
-use chrono::{Datelike, Local};
+use chrono::{Datelike, Local, Utc};
 use futures_util::StreamExt as _;
 use image::ImageFormat;
 use log::{error, info};
@@ -14,7 +15,8 @@ use qiniu_upload_manager::{
     AutoUploader, AutoUploaderObjectParams, UploadManager as QiNiuUploadManager, UploadTokenSigner,
     apis::credential::Credential,
 };
-use sea_orm::DatabaseConnection;
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, DatabaseConnection};
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -22,7 +24,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 // 常量定义
-const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE: i64 = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp"];
 const RESIZE_WIDTH: u32 = 1920;
 const RESIZE_HEIGHT: u32 = 1080;
@@ -45,7 +47,7 @@ struct UploadResult {
     #[allow(dead_code)]
     filename: String,
     #[allow(dead_code)]
-    size: u64,
+    size: i64,
     #[allow(dead_code)]
     human_readable_size: String,
 }
@@ -54,7 +56,7 @@ struct UploadResult {
 struct FileInfo {
     filename: String,
     temp_path: PathBuf,
-    size: u64,
+    size: i64,
 }
 
 // 图片服务
@@ -62,7 +64,7 @@ pub struct ImageService;
 
 impl ImageService {
     /// 处理图片上传
-    pub async fn handle_upload(_db: &DatabaseConnection, mut payload: Multipart) -> HttpResult {
+    pub async fn handle_upload(db: &DatabaseConnection, mut payload: Multipart) -> HttpResult {
         let file_info = Self::process_multipart(&mut payload).await?;
 
         match Self::upload_to_qiniu(&file_info.temp_path, &file_info.filename, file_info.size).await
@@ -77,17 +79,18 @@ impl ImageService {
                 );
 
                 // 保存图片信息到数据库
-                // let image_record = Self::save_image_to_db(db, &upload_result).await?;
+                let image_record = Self::save_image_to_db(db, &upload_result).await?;
 
                 let response = ImageUploadResponse {
-                    // id: image_record.id,
-                    id: 12,
+                    id: image_record.id,
+                    // id: 12,
                     url: upload_result.url,
                     key: upload_result.key,
                     filename: upload_result.filename,
                     size: upload_result.size,
                     human_readable_size: upload_result.human_readable_size,
-                    created_at: "image_record.created_at.to_rfc3339()".to_string(),
+                    created_at: image_record.created_at,
+                    // created_at: "image_record.created_at.to_rfc3339()".to_string(),
                 };
 
                 Ok(ApiResponse::success(response, "图片上传成功").to_http_response())
@@ -256,13 +259,13 @@ impl ImageService {
     async fn write_file_data(
         field: &mut actix_multipart::Field,
         temp_file: &mut std::fs::File,
-    ) -> Result<u64, AppError> {
-        let mut file_size = 0u64;
+    ) -> Result<i64, AppError> {
+        let mut file_size = 0i64;
 
         while let Some(chunk) = field.next().await {
             let data = chunk.map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
-            file_size += data.len() as u64;
+            file_size += data.len() as i64;
             if file_size > MAX_FILE_SIZE {
                 return Err(AppError::BadRequest("文件过大".to_string()));
             }
@@ -315,7 +318,7 @@ impl ImageService {
     async fn upload_to_qiniu(
         file_path: &Path,
         original_filename: &str,
-        file_size: u64,
+        file_size: i64,
     ) -> AnyhowResult<UploadResult> {
         log::info!("开始上传文件到七牛云{:?}", &CONFIG.qi_niu);
         let credential = Credential::new(&CONFIG.qi_niu.access_key, &CONFIG.qi_niu.secret_key);
@@ -344,12 +347,13 @@ impl ImageService {
             .upload_path(file_path, params)
             .context("无法将文件上传到七牛云")?;
 
-        let key = response["key"]
+        let key: String = response["key"]
             .as_str()
             .context("无法从上传响应中获取密钥")?
             .to_string();
 
         let final_url = Self::build_final_url(&key);
+
         let human_readable_size = FileSize::from(file_size).to_string();
 
         Ok(UploadResult {
@@ -399,27 +403,27 @@ impl ImageService {
     }
 
     // 保存图片信息到数据库
-    // async fn save_image_to_db(
-    //     &self,
-    //     upload_result: &UploadResult,
-    // ) -> Result<images::Model, AppError> {
-    //     let now = Utc::now();
-    //     let active_model = images::ActiveModel {
-    //         url: Set(upload_result.url.clone()),
-    //         key: Set(upload_result.key.clone()),
-    //         filename: Set(upload_result.filename.clone()),
-    //         size: Set(upload_result.size),
-    //         human_readable_size: Set(upload_result.human_readable_size.clone()),
-    //         created_at: Set(now),
-    //         updated_at: Set(now),
-    //         ..Default::default()
-    //     };
+    async fn save_image_to_db(
+        db: &DatabaseConnection,
+        upload_result: &UploadResult,
+    ) -> Result<images::Model, AppError> {
+        let now = Utc::now();
+        let active_model = images::ActiveModel {
+            url: Set(upload_result.url.clone()),
+            key: Set(upload_result.key.clone()),
+            filename: Set(upload_result.filename.clone()),
+            size: Set(upload_result.size),
+            human_readable_size: Set(upload_result.human_readable_size.clone()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
 
-    //     let result = active_model
-    //         .insert(&self.db)
-    //         .await
-    //         .map_err(|e| AppError::InternalServerError(format!("保存图片信息失败: {}", e)))?;
+        let result = active_model
+            .insert(db)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("保存图片信息失败: {}", e)))?;
 
-    //     Ok(result)
-    // }
+        Ok(result)
+    }
 }
