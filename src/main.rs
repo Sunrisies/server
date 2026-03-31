@@ -1,11 +1,12 @@
 use actix_cors::Cors;
 use actix_web::{
     App, HttpServer,
-    http::{self},
+    http::{self, header},
     web,
 };
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
+use url::Url;
 use web_server::utils::json_err_map;
 use web_server::{
     SseNotifier,
@@ -55,9 +56,6 @@ async fn main() -> Result<()> {
     );
     let server = HttpServer::new(move || {
         let cors = Cors::default()
-            .allowed_origin("http://127.0.0.1:5502")
-            .allowed_origin("https://blog.sunrise1024.top")
-            .allowed_origin("http://localhost:12002")
             .allowed_methods(vec![
                 http::Method::GET,
                 http::Method::POST,
@@ -66,12 +64,33 @@ async fn main() -> Result<()> {
                 http::Method::OPTIONS,
             ])
             .allowed_headers(vec![
-                http::header::AUTHORIZATION,
-                http::header::ACCEPT,
-                http::header::CONTENT_TYPE,
+                header::AUTHORIZATION,
+                header::ACCEPT,
+                header::CONTENT_TYPE,
             ])
             .supports_credentials()
-            .max_age(3600);
+            .max_age(3600)
+            .allowed_origin_fn(|origin, _req| {
+                let origin_str = match origin.to_str() {
+                    Ok(s) => s,
+                    Err(_) => return false,
+                };
+
+                // 解析 Origin 得到主机名（host）
+                if let Ok(url) = Url::parse(origin_str)
+                    && let Some(host) = url.host_str()
+                {
+                    // 1. 允许本地开发来源（127.0.0.1 或 localhost，任意端口）
+                    if host == "127.0.0.1" || host == "localhost" {
+                        return true;
+                    }
+                    // 2. 允许线上域名：sunrise1024.top 及其所有子域名
+                    if host == "sunrise1024.top" || host.ends_with(".sunrise1024.top") {
+                        return true;
+                    }
+                }
+                false
+            });
         App::new()
             .wrap(Auth)
             .app_data(web::JsonConfig::default().error_handler(|err, _| json_err_map(err)))
