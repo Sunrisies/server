@@ -3,7 +3,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::config::manager::CONFIG;
 
@@ -254,8 +254,8 @@ impl EmailVerificationCode {
         Self {
             email,
             code,
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
             used: false,
@@ -272,8 +272,8 @@ impl EmailVerificationCode {
             return false;
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
 

@@ -93,8 +93,8 @@ impl UploadManager {
             Err(e) => {
                 // 清理临时文件
                 let _ = tokio::fs::remove_file(&file_info.temp_path).await;
-                error!("Upload failed: {}", e);
-                Err(AppError::UploadFailed(format!("上传失败: {}", e)))
+                error!("Upload failed: {e}");
+                Err(AppError::UploadFailed(format!("上传失败: {e}")))
             }
         }
     }
@@ -103,7 +103,7 @@ impl UploadManager {
     async fn process_multipart(&self, payload: &mut Multipart) -> Result<FileInfo, AppError> {
         while let Some(item) = payload.next().await {
             let mut field =
-                item.map_err(|e| AppError::InternalServerError(format!("Multipart error: {}", e)))?;
+                item.map_err(|e| AppError::InternalServerError(format!("Multipart error: {e}")))?;
 
             let content_disposition = match field.content_disposition() {
                 Some(cd) => cd,
@@ -115,7 +115,7 @@ impl UploadManager {
                 None => continue,
             };
 
-            info!("开始上传文件: {}", filename);
+            info!("开始上传文件: {filename}");
 
             // 验证文件扩展名
             self.validate_extension(&filename)?;
@@ -127,7 +127,7 @@ impl UploadManager {
             let file_size = self.write_file_data(&mut field, &mut temp_file).await?;
 
             // 处理图片（调整大小等）
-            self.process_image(&temp_path, &filename).await?;
+            self.process_image(&temp_path, &filename)?;
 
             return Ok(FileInfo {
                 filename,
@@ -157,7 +157,7 @@ impl UploadManager {
     async fn create_temp_file(&self, filename: &str) -> Result<(PathBuf, std::fs::File), AppError> {
         let temp_dir = PathBuf::from("temp_uploads");
         fs::create_dir_all(&temp_dir)
-            .map_err(|e| AppError::InternalServerError(format!("创建临时目录失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("创建临时目录失败: {e}")))?;
 
         let extension = Path::new(filename)
             .extension()
@@ -167,7 +167,7 @@ impl UploadManager {
         let temp_path = temp_dir.join(format!("{}.{}", Uuid::new_v4(), extension));
 
         let temp_file = std::fs::File::create(&temp_path)
-            .map_err(|e| AppError::InternalServerError(format!("创建临时文件失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("创建临时文件失败: {e}")))?;
 
         Ok((temp_path, temp_file))
     }
@@ -190,17 +190,17 @@ impl UploadManager {
 
             temp_file
                 .write_all(&data)
-                .map_err(|e| AppError::InternalServerError(format!("写入临时文件失败: {}", e)))?;
+                .map_err(|e| AppError::InternalServerError(format!("写入临时文件失败: {e}")))?;
         }
 
         Ok(file_size)
     }
 
     /// 处理图片（调整大小等）
-    async fn process_image(&self, temp_path: &Path, filename: &str) -> Result<(), AppError> {
+    fn process_image(&self, temp_path: &Path, filename: &str) -> Result<(), AppError> {
         // 验证图片有效性
         let image = image::open(temp_path)
-            .map_err(|e| AppError::BadRequest(format!("无效的图片文件: {}", e)))?;
+            .map_err(|e| AppError::BadRequest(format!("无效的图片文件: {e}")))?;
 
         // 调整图片大小
         let resized_image = image.resize(
@@ -211,11 +211,11 @@ impl UploadManager {
 
         // 重新保存调整后的图片
         let mut temp_file = std::fs::File::create(temp_path)
-            .map_err(|e| AppError::InternalServerError(format!("重新打开临时文件失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("重新打开临时文件失败: {e}")))?;
 
         temp_file
             .seek(SeekFrom::Start(0))
-            .map_err(|e| AppError::InternalServerError(format!("文件寻址失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("文件寻址失败: {e}")))?;
 
         let extension = Path::new(filename)
             .extension()
@@ -227,7 +227,7 @@ impl UploadManager {
 
         resized_image
             .save_with_format(temp_path, format)
-            .map_err(|e| AppError::InternalServerError(format!("保存图片失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("保存图片失败: {e}")))?;
 
         Ok(())
     }

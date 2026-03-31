@@ -34,7 +34,7 @@ impl PostService {
 
         // 开启事务
         let txn = db.begin().await.map_err(|e| {
-            log::error!("开启事务失败: {}", e);
+            log::error!("开启事务失败: {e}");
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
 
@@ -59,7 +59,7 @@ impl PostService {
         };
 
         let created_post = new_post.insert(&txn).await.map_err(|e| {
-            log::error!("创建文章失败: {}", e);
+            log::error!("创建文章失败: {e}");
             AppError::DatabaseError("创建文章失败".to_string())
         })?;
 
@@ -71,14 +71,14 @@ impl PostService {
             };
 
             post_tag.insert(&txn).await.map_err(|e| {
-                log::error!("添加文章标签关联失败: {}", e);
+                log::error!("添加文章标签关联失败: {e}");
                 AppError::DatabaseError("添加文章标签关联失败".to_string())
             })?;
         }
 
         // 提交事务
         txn.commit().await.map_err(|e| {
-            log::error!("提交事务失败: {}", e);
+            log::error!("提交事务失败: {e}");
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
 
@@ -87,7 +87,7 @@ impl PostService {
             .one(db)
             .await
             .map_err(|e| {
-                log::error!("查询作者信息失败: {}", e);
+                log::error!("查询作者信息失败: {e}");
                 AppError::DatabaseError("查询作者信息失败".to_string())
             })?
             .map(|user| user.user_name)
@@ -98,7 +98,7 @@ impl PostService {
             .one(db)
             .await
             .map_err(|e| {
-                log::error!("查询分类信息失败: {}", e);
+                log::error!("查询分类信息失败: {e}");
                 AppError::DatabaseError("查询分类信息失败".to_string())
             })?
             .map(|cat| crate::dto::posts::CategoryResponse {
@@ -113,7 +113,7 @@ impl PostService {
             .all(db)
             .await
             .map_err(|e| {
-                log::error!("查询标签信息失败: {}", e);
+                log::error!("查询标签信息失败: {e}");
                 AppError::DatabaseError("查询标签信息失败".to_string())
             })?;
 
@@ -160,7 +160,7 @@ impl PostService {
             .one(db)
             .await
             .map_err(|e| {
-                log::error!("查询文章失败: {}", e);
+                log::error!("查询文章失败: {e}");
                 AppError::DatabaseError("服务器内部错误".to_string())
             })?
             .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
@@ -172,7 +172,7 @@ impl PostService {
 
         // 开启事务
         let txn = db.begin().await.map_err(|e| {
-            log::error!("开启事务失败: {}", e);
+            log::error!("开启事务失败: {e}");
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
 
@@ -213,7 +213,7 @@ impl PostService {
         active_post.updated_at = Set(now);
 
         let updated_post = active_post.update(&txn).await.map_err(|e| {
-            log::error!("更新文章失败: {}", e);
+            log::error!("更新文章失败: {e}");
             AppError::DatabaseError("更新文章失败".to_string())
         })?;
 
@@ -225,7 +225,7 @@ impl PostService {
                 .exec(&txn)
                 .await
                 .map_err(|e| {
-                    log::error!("删除文章标签关联失败: {}", e);
+                    log::error!("删除文章标签关联失败: {e}");
                     AppError::DatabaseError("更新文章标签关联失败".to_string())
                 })?;
 
@@ -237,7 +237,7 @@ impl PostService {
                 };
 
                 post_tag.insert(&txn).await.map_err(|e| {
-                    log::error!("添加文章标签关联失败: {}", e);
+                    log::error!("添加文章标签关联失败: {e}");
                     AppError::DatabaseError("更新文章标签关联失败".to_string())
                 })?;
             }
@@ -245,7 +245,7 @@ impl PostService {
 
         // 提交事务
         txn.commit().await.map_err(|e| {
-            log::error!("提交事务失败: {}", e);
+            log::error!("提交事务失败: {e}");
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
 
@@ -254,7 +254,7 @@ impl PostService {
             .one(db)
             .await
             .map_err(|e| {
-                log::error!("查询作者信息失败: {}", e);
+                log::error!("查询作者信息失败: {e}");
                 AppError::DatabaseError("查询作者信息失败".to_string())
             })?
             .map(|user| user.user_name)
@@ -265,7 +265,7 @@ impl PostService {
             .one(db)
             .await
             .map_err(|e| {
-                log::error!("查询分类信息失败: {}", e);
+                log::error!("查询分类信息失败: {e}");
                 AppError::DatabaseError("查询分类信息失败".to_string())
             })?
             .map(|cat| crate::dto::posts::CategoryResponse {
@@ -280,7 +280,7 @@ impl PostService {
             .all(db)
             .await
             .map_err(|e| {
-                log::error!("查询标签信息失败: {}", e);
+                log::error!("查询标签信息失败: {e}");
                 AppError::DatabaseError("查询标签信息失败".to_string())
             })?;
 
@@ -324,7 +324,7 @@ impl PostService {
             .one(db)
             .await
             .map_err(|e| {
-                log::error!("查询文章失败: {}", e);
+                log::error!("查询文章失败: {e}");
                 AppError::DatabaseError("服务器内部错误".to_string())
             })?
             .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
@@ -336,7 +336,7 @@ impl PostService {
 
         // 开启事务
         let txn = db.begin().await.map_err(|e| {
-            log::error!("开启事务失败: {}", e);
+            log::error!("开启事务失败: {e}");
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
 
@@ -346,7 +346,7 @@ impl PostService {
             .exec(&txn)
             .await
             .map_err(|e| {
-                log::error!("删除文章标签关联失败: {}", e);
+                log::error!("删除文章标签关联失败: {e}");
                 AppError::DatabaseError("删除文章失败".to_string())
             })?;
 
@@ -355,13 +355,13 @@ impl PostService {
             .exec(&txn)
             .await
             .map_err(|e| {
-                log::error!("删除文章失败: {}", e);
+                log::error!("删除文章失败: {e}");
                 AppError::DatabaseError("删除文章失败".to_string())
             })?;
 
         // 提交事务
         txn.commit().await.map_err(|e| {
-            log::error!("提交事务失败: {}", e);
+            log::error!("提交事务失败: {e}");
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
 

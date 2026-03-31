@@ -67,8 +67,7 @@ impl ImageService {
     pub async fn handle_upload(db: &DatabaseConnection, mut payload: Multipart) -> HttpResult {
         let file_info = Self::process_multipart(&mut payload).await?;
 
-        match Self::upload_to_qiniu(&file_info.temp_path, &file_info.filename, file_info.size).await
-        {
+        match Self::upload_to_qiniu(&file_info.temp_path, &file_info.filename, file_info.size) {
             Ok(upload_result) => {
                 // 清理临时文件
                 let _ = tokio::fs::remove_file(&file_info.temp_path).await;
@@ -98,8 +97,8 @@ impl ImageService {
             Err(e) => {
                 // 清理临时文件
                 let _ = tokio::fs::remove_file(&file_info.temp_path).await;
-                error!("Upload failed: {}", e);
-                Err(AppError::UploadFailed(format!("上传失败: {}", e)))
+                error!("Upload failed: {e}");
+                Err(AppError::UploadFailed(format!("上传失败: {e}")))
             }
         }
     }
@@ -186,7 +185,7 @@ impl ImageService {
     async fn process_multipart(payload: &mut Multipart) -> Result<FileInfo, AppError> {
         while let Some(item) = payload.next().await {
             let mut field =
-                item.map_err(|e| AppError::InternalServerError(format!("Multipart error: {}", e)))?;
+                item.map_err(|e| AppError::InternalServerError(format!("Multipart error: {e}")))?;
 
             let content_disposition = match field.content_disposition() {
                 Some(cd) => cd,
@@ -198,7 +197,7 @@ impl ImageService {
                 None => continue,
             };
 
-            info!("开始上传文件: {}", filename);
+            info!("开始上传文件: {filename}");
 
             // 验证文件扩展名
             Self::validate_extension(&filename)?;
@@ -210,7 +209,7 @@ impl ImageService {
             let file_size = Self::write_file_data(&mut field, &mut temp_file).await?;
 
             // 处理图片（调整大小等）
-            Self::process_image(&temp_path, &filename).await?;
+            Self::process_image(&temp_path, &filename)?;
 
             return Ok(FileInfo {
                 filename,
@@ -240,7 +239,7 @@ impl ImageService {
     async fn create_temp_file(filename: &str) -> Result<(PathBuf, std::fs::File), AppError> {
         let temp_dir = PathBuf::from("temp_uploads");
         fs::create_dir_all(&temp_dir)
-            .map_err(|e| AppError::InternalServerError(format!("创建临时目录失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("创建临时目录失败: {e}")))?;
 
         let extension = Path::new(filename)
             .extension()
@@ -250,7 +249,7 @@ impl ImageService {
         let temp_path = temp_dir.join(format!("{}.{}", Uuid::new_v4(), extension));
 
         let temp_file = std::fs::File::create(&temp_path)
-            .map_err(|e| AppError::InternalServerError(format!("创建临时文件失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("创建临时文件失败: {e}")))?;
 
         Ok((temp_path, temp_file))
     }
@@ -272,17 +271,17 @@ impl ImageService {
 
             temp_file
                 .write_all(&data)
-                .map_err(|e| AppError::InternalServerError(format!("写入临时文件失败: {}", e)))?;
+                .map_err(|e| AppError::InternalServerError(format!("写入临时文件失败: {e}")))?;
         }
 
         Ok(file_size)
     }
 
     /// 处理图片（调整大小等）
-    async fn process_image(temp_path: &Path, filename: &str) -> Result<(), AppError> {
+    fn process_image(temp_path: &Path, filename: &str) -> Result<(), AppError> {
         // 验证图片有效性
         let image = image::open(temp_path)
-            .map_err(|e| AppError::BadRequest(format!("无效的图片文件: {}", e)))?;
+            .map_err(|e| AppError::BadRequest(format!("无效的图片文件: {e}")))?;
 
         // 调整图片大小
         let resized_image = image.resize(
@@ -293,11 +292,11 @@ impl ImageService {
 
         // 重新保存调整后的图片
         let mut temp_file = std::fs::File::create(temp_path)
-            .map_err(|e| AppError::InternalServerError(format!("重新打开临时文件失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("重新打开临时文件失败: {e}")))?;
 
         temp_file
             .seek(SeekFrom::Start(0))
-            .map_err(|e| AppError::InternalServerError(format!("文件寻址失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("文件寻址失败: {e}")))?;
 
         let extension = Path::new(filename)
             .extension()
@@ -309,13 +308,13 @@ impl ImageService {
 
         resized_image
             .save_with_format(temp_path, format)
-            .map_err(|e| AppError::InternalServerError(format!("保存图片失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("保存图片失败: {e}")))?;
 
         Ok(())
     }
 
     /// 上传文件到七牛云
-    async fn upload_to_qiniu(
+    fn upload_to_qiniu(
         file_path: &Path,
         original_filename: &str,
         file_size: i64,
@@ -422,7 +421,7 @@ impl ImageService {
         let result = active_model
             .insert(db)
             .await
-            .map_err(|e| AppError::InternalServerError(format!("保存图片信息失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("保存图片信息失败: {e}")))?;
 
         Ok(result)
     }

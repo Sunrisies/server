@@ -3,14 +3,14 @@ use crate::models::{
     permissions::{self},
     role_permissions,
 };
-use once_cell::sync::Lazy;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 use tokio::sync::RwLock;
 
 /// 角色 → 权限码集合
-pub static ROLE_PERMS: Lazy<RwLock<HashMap<i32, HashSet<String>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+pub static ROLE_PERMS: LazyLock<RwLock<HashMap<i32, HashSet<String>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub async fn load_perm_cache(db: &DatabaseConnection) -> Result<(), AppError> {
     // 1. 角色权限模板

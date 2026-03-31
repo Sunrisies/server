@@ -106,9 +106,9 @@ async fn main() -> Result<()> {
 
     server
         .bind((CONFIG.server.host.as_str(), CONFIG.server.port))?
-        .on_connect(move |conn, _addr| {
-            println!("New connection: {:?}", conn);
-            println!("Remote address: {:?}", _addr);
+        .on_connect(move |conn, addr| {
+            println!("New connection: {conn:?}");
+            println!("Remote address: {addr:?}");
         })
         .run()
         .await?;

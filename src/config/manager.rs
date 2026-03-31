@@ -1,8 +1,7 @@
 use dotenvy::dotenv;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-use std::env;
+use std::{env, sync::LazyLock};
 
 use crate::{email::SmtpSettings, upload::QiNiuSettings};
 
@@ -161,7 +160,7 @@ impl Default for AppConfig {
         // }
     }
 }
-pub static CONFIG: Lazy<AppConfig> = Lazy::new(AppConfig::default);
+pub static CONFIG: LazyLock<AppConfig> = LazyLock::new(AppConfig::default);
 
 impl AppConfig {
     // 获取全局配置的静态方法
