@@ -42,7 +42,7 @@ impl EmailService {
     }
 
     /// 发送验证码邮件
-    pub async fn send_verification_code(&self, to_email: &str, code: &str) -> Result<()> {
+    pub fn send_verification_code(&self, to_email: &str, code: &str) -> Result<()> {
         let subject = "博客系统验证码";
         let body = format!(
             r#"
@@ -63,11 +63,11 @@ impl EmailService {
             self.settings.code_validity_period / 60
         );
         // Ok(())
-        self.send_email(to_email, subject, &body).await
+        self.send_email(to_email, subject, &body)
     }
 
     /// 发送密码重置邮件
-    pub async fn send_password_reset(&self, to_email: &str, reset_link: &str) -> Result<()> {
+    pub fn send_password_reset(&self, to_email: &str, reset_link: &str) -> Result<()> {
         let subject = "博客系统密码重置";
         let body = format!(
             r#"
@@ -91,7 +91,7 @@ impl EmailService {
             self.settings.code_validity_period / 60
         );
 
-        self.send_email(to_email, subject, &body).await
+        self.send_email(to_email, subject, &body)
     }
 
     /// 发送欢迎邮件
@@ -114,11 +114,15 @@ impl EmailService {
             username
         );
 
-        self.send_email(to_email, subject, &body).await
+        self.send_email(to_email, subject, &body)
     }
 
     /// 发送新评论通知邮件
-    pub async fn send_comment_notification(
+    ///
+    /// # Errors
+    ///
+    /// 当邮件发送失败（如 SMTP 连接错误、认证失败或收件人地址无效）时返回 `Err`。
+    pub fn send_comment_notification(
         &self,
         to_email: &str,
         author_name: &str,
@@ -147,11 +151,11 @@ impl EmailService {
             author_name, post_title, comment_content, comment_link
         );
 
-        self.send_email(to_email, subject, &body).await
+        self.send_email(to_email, subject, &body)
     }
 
     /// 发送邮件的通用方法
-    async fn send_email(&self, to_email: &str, subject: &str, body: &str) -> Result<()> {
+    fn send_email(&self, to_email: &str, subject: &str, body: &str) -> Result<()> {
         // 创建邮件
         let email = Message::builder()
             .from(
@@ -191,12 +195,12 @@ impl EmailService {
         // 发送邮件
         match mailer.send(&email) {
             Ok(_) => {
-                log::info!("Email successfully sent to {}", to_email);
+                log::info!("Email successfully sent to {to_email}");
                 Ok(())
             }
             Err(e) => {
-                log::error!("Could not send email to {}: {:?}", to_email, e);
-                Err(anyhow::anyhow!("Failed to send email: {}", e))
+                log::error!("Could not send email to {to_email}: {e:?}");
+                Err(anyhow::anyhow!("Failed to send email: {e}"))
             }
         }
     }
@@ -327,7 +331,7 @@ impl EmailVerificationManager {
         }
 
         // 发送邮件
-        email_service.send_verification_code(email, &code).await?;
+        email_service.send_verification_code(email, &code)?;
 
         Ok(code)
     }

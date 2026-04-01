@@ -67,10 +67,7 @@ impl UploadManager {
     pub async fn handle_upload(&self, mut payload: Multipart) -> HttpResult {
         let file_info = self.process_multipart(&mut payload).await?;
 
-        match self
-            .upload_to_qiniu(&file_info.temp_path, &file_info.filename, file_info.size)
-            .await
-        {
+        match self.upload_to_qiniu(&file_info.temp_path, &file_info.filename, file_info.size) {
             Ok((final_url, key)) => {
                 // 清理临时文件
                 let _ = tokio::fs::remove_file(&file_info.temp_path).await;
@@ -102,9 +99,7 @@ impl UploadManager {
     /// 处理 multipart 数据，提取文件信息
     async fn process_multipart(&self, payload: &mut Multipart) -> Result<FileInfo, AppError> {
         while let Some(item) = payload.next().await {
-            let mut field =
-                item.map_err(|e| AppError::InternalServerError(format!("Multipart error: {e}")))?;
-
+            let mut field = item.map_err(|e| AppError::MultipartError(e.to_string()))?;
             let content_disposition = match field.content_disposition() {
                 Some(cd) => cd,
                 None => continue,
@@ -233,7 +228,7 @@ impl UploadManager {
     }
 
     /// 上传文件到七牛云
-    async fn upload_to_qiniu(
+    fn upload_to_qiniu(
         &self,
         file_path: &Path,
         original_filename: &str,
@@ -251,10 +246,7 @@ impl UploadManager {
         let uploader: AutoUploader = upload_manager.auto_uploader();
         let object_key = self.generate_object_key(original_filename);
 
-        info!(
-            "上传文件 '{}' 到: {} ({} 字节)",
-            original_filename, object_key, file_size
-        );
+        info!("上传文件 '{original_filename}' 到: {object_key} ({file_size} 字节)");
 
         let params = AutoUploaderObjectParams::builder()
             .object_name(&object_key)

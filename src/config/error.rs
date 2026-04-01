@@ -49,6 +49,7 @@ pub enum AppError {
     // 其他错误
     NotImplemented(String),
     MaintenanceMode(String),
+    MultipartError(String), // 新增
 }
 
 impl AppError {
@@ -85,6 +86,7 @@ impl AppError {
             | AppError::EncryptionError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
             AppError::MaintenanceMode(_) => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::MultipartError(_) => StatusCode::BAD_REQUEST, // 新增
         }
     }
 
@@ -141,6 +143,7 @@ impl fmt::Display for AppError {
             AppError::EncryptionError(msg) => write!(f, "加密错误: {}", msg),
             AppError::NotImplemented(msg) => write!(f, "未实现: {}", msg),
             AppError::MaintenanceMode(msg) => write!(f, "维护模式: {}", msg),
+            AppError::MultipartError(msg) => write!(f, "Multipart 错误: {}", msg), // 新增
         }
     }
 }

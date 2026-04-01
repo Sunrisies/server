@@ -194,7 +194,7 @@ impl AuthService {
                 "data": user
             })))
     }
-    pub async fn login_by_phone(
+    pub fn login_by_phone(
         _db_pool: web::Data<DatabaseConnection>,
         phone: PhoneLogin,
     ) -> HttpResult {
@@ -202,7 +202,7 @@ impl AuthService {
 
         Ok(ApiResponse::success("user", "手机号").to_http_response())
     }
-    pub async fn login_by_oauth(
+    pub fn login_by_oauth(
         _db_pool: web::Data<DatabaseConnection>,
         oauth: OAuthLogin,
     ) -> HttpResult {

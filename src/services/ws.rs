@@ -23,7 +23,7 @@ pub async fn echo(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse
         while let Some(msg) = stream.next().await {
             match msg {
                 Ok(AggregatedMessage::Text(text)) => {
-                    println!("Received text message: {}", text);
+                    println!("Received text message: {text}");
                     session.text(text).await.unwrap();
                 }
 
@@ -79,7 +79,7 @@ pub async fn chat_route(
         server
             .broadcast_system_message(
                 &room_name,
-                &format!("用户已加入房间。在线用户: {}", user_count),
+                &format!("用户已加入房间。在线用户: {user_count}"),
             )
             .await;
     }
@@ -111,10 +111,7 @@ async fn handle_ws_messages(
     while let Some(Ok(msg)) = msg_stream.next().await {
         match msg {
             Message::Text(text) => {
-                println!(
-                    "Received text message from  in room {}: {}",
-                    room_name, text
-                );
+                println!("Received text message from  in room {room_name}: {text}");
 
                 // 解析客户端消息
                 match serde_json::from_str::<ClientMessage>(&text) {
@@ -122,7 +119,9 @@ async fn handle_ws_messages(
                         // 创建广播消息
                         let broadcast_msg = BroadcastMessage {
                             user_nickname: Some(
-                                client_msg.user_nickname.unwrap_or("系统回复".to_string()),
+                                client_msg
+                                    .user_nickname
+                                    .unwrap_or_else(|| "系统回复".to_string()),
                             ),
                             room_id: client_msg.room_id,
                             room_name: room_name.clone(),
@@ -143,11 +142,11 @@ async fn handle_ws_messages(
                         if let Err(e) =
                             save_message_to_db(db_pool.get_ref(), &broadcast_msg_clone).await
                         {
-                            eprintln!("Failed to save message to database: {}", e);
+                            eprintln!("Failed to save message to database: {e}");
                         }
                     }
                     Err(e) => {
-                        println!("Failed to parse message: {}", e);
+                        println!("Failed to parse message: {e}");
 
                         // 发送错误消息回客户端
                         let error_msg = serde_json::json!({
@@ -163,8 +162,7 @@ async fn handle_ws_messages(
             }
             Message::Binary(bin) => {
                 println!(
-                    "Received binary message from in room {}: {} bytes",
-                    room_name,
+                    "Received binary message from in room {room_name}: {} bytes",
                     bin.len()
                 );
 
@@ -173,19 +171,19 @@ async fn handle_ws_messages(
                 let _ = session.binary(bin).await;
             }
             Message::Ping(bytes) => {
-                println!("Received ping from in room {}", room_name);
+                println!("Received ping from in room {room_name}");
                 let _ = session.pong(&bytes).await;
             }
             Message::Pong(_) => {
                 // 忽略pong消息
             }
             Message::Close(reason) => {
-                println!("WebSocket closed by  in room {}: {:?}", room_name, reason);
+                println!("WebSocket closed by  in room {room_name}: {reason:?}");
                 break;
             }
             Message::Continuation(_) => {
                 // 处理continuation帧
-                println!("Received continuation frame from in room {}", room_name);
+                println!("Received continuation frame from in room {room_name}");
             }
             Message::Nop => {
                 // 无操作
@@ -194,7 +192,7 @@ async fn handle_ws_messages(
     }
 
     // 连接断开，从聊天服务器移除
-    println!("WebSocket connection closed for  in room {}", room_name);
+    println!("WebSocket connection closed for  in room {room_name}");
 
     {
         let mut server = chat_server.lock().await;
@@ -204,7 +202,7 @@ async fn handle_ws_messages(
         server
             .broadcast_system_message(
                 &room_name,
-                &format!("一位用户离开了房间。在线用户: {}", user_count),
+                &format!("一位用户离开了房间。在线用户: {user_count}"),
             )
             .await;
     }
@@ -215,7 +213,7 @@ async fn save_message_to_db(
     msg: &BroadcastMessage,
 ) -> Result<(), sea_orm::DbErr> {
     // 根据房间号去查房间id
-    log::info!("msg: {:?}", msg);
+    log::info!("msg: {msg:?}");
     let new_message = room_messages::ActiveModel {
         room_id: Set(Some(msg.room_id)),
         message_type: Set(msg.message_type.clone()),

@@ -90,8 +90,7 @@ impl PostService {
                 log::error!("查询作者信息失败: {e}");
                 AppError::DatabaseError("查询作者信息失败".to_string())
             })?
-            .map(|user| user.user_name)
-            .unwrap_or_else(|| "未知作者".to_string());
+            .map_or_else(|| "未知作者".to_string(), |user| user.user_name);
 
         // 查询分类信息
         let category = categories::Entity::find_by_id(created_post.category_id)
@@ -257,8 +256,7 @@ impl PostService {
                 log::error!("查询作者信息失败: {e}");
                 AppError::DatabaseError("查询作者信息失败".to_string())
             })?
-            .map(|user| user.user_name)
-            .unwrap_or_else(|| "未知作者".to_string());
+            .map_or_else(|| "未知作者".to_string(), |user| user.user_name);
 
         // 查询分类信息
         let category = categories::Entity::find_by_id(updated_post.category_id)

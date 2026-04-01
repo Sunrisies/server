@@ -71,9 +71,8 @@ async fn main() -> Result<()> {
             .supports_credentials()
             .max_age(3600)
             .allowed_origin_fn(|origin, _req| {
-                let origin_str = match origin.to_str() {
-                    Ok(s) => s,
-                    Err(_) => return false,
+                let Ok(origin_str) = origin.to_str() else {
+                    return false;
                 };
 
                 // 解析 Origin 得到主机名（host）

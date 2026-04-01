@@ -59,7 +59,7 @@ pub async fn login(
     match login.0 {
         LoginRequest::Password(p) => AuthService::login_by_pwd(db_pool, p).await,
         LoginRequest::Email(e) => AuthService::login_by_email(db_pool, e, email_manager).await,
-        LoginRequest::Phone(p) => AuthService::login_by_phone(db_pool, p).await,
-        LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o).await,
+        LoginRequest::Phone(p) => AuthService::login_by_phone(db_pool, p),
+        LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o),
     }
 }
