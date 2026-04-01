@@ -59,7 +59,7 @@ impl Default for UploadManager {
 }
 
 impl UploadManager {
-    pub fn new(config: QiNiuSettings) -> Self {
+    pub const fn new(config: QiNiuSettings) -> Self {
         Self { config }
     }
 

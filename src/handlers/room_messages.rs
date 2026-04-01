@@ -17,6 +17,6 @@ pub async fn get_room_messages_handler(
         .filter(room_messages::Column::RoomId.eq(room_id))
         .all(db.as_ref())
         .await?;
-    log::info!("messages: {:?}", messages);
+    log::info!("messages: {messages:?}");
     Ok(ApiResponse::success(messages, "获取房间信息成功").to_http_response())
 }

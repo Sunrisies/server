@@ -111,7 +111,7 @@ impl AuthService {
             Ok(true) => {
                 // 登录成功
                 let token = generate_jwt(&db_pool, &user).await?;
-                log::info!("login_by_pwd token: {:?}", token);
+                log::info!("login_by_pwd token: {token:?}");
                 // 2. 构造 Cookie
                 let cookie = Cookie::build("access_token", token)
                     .http_only(true) // 防 XSS
@@ -145,13 +145,13 @@ impl AuthService {
         // email_service: web::Data<EmailService>,
         email_verification_manager: web::Data<EmailVerificationManager>,
     ) -> HttpResult {
-        log::info!("login_by_email{:?}", email);
+        log::info!("login_by_email{email:?}");
 
         // 验证验证码
         let is_valid = email_verification_manager
             .verify_code(&email.email, &email.code)
             .await
-            .map_err(|e| AppError::InternalServerError(format!("验证验证码失败: {}", e)))?;
+            .map_err(|e| AppError::InternalServerError(format!("验证验证码失败: {e}")))?;
 
         if !is_valid {
             return Err(AppError::BadRequest("验证码无效或已过期".to_string()));
@@ -175,7 +175,7 @@ impl AuthService {
         // 生成JWT令牌
         let token = generate_jwt(&db_pool, &user).await?;
 
-        log::info!("login_by_email token: {:?}", token);
+        log::info!("login_by_email token: {token:?}");
 
         // 构造Cookie
         let cookie = Cookie::build("access_token", token)
@@ -198,7 +198,7 @@ impl AuthService {
         _db_pool: web::Data<DatabaseConnection>,
         phone: PhoneLogin,
     ) -> HttpResult {
-        log::info!("login_by_phone{:?}", phone);
+        log::info!("login_by_phone{phone:?}");
 
         Ok(ApiResponse::success("user", "手机号").to_http_response())
     }

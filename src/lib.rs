@@ -40,29 +40,38 @@ lazy_static! {
     pub static ref ROUTE_REGISTRY: RwLock<HashMap<String, RouteInfo>> = RwLock::new(HashMap::new());
 }
 
-// 自动初始化路由注册表
-pub fn init_route_registry() {
-    let mut registry = ROUTE_REGISTRY.write().unwrap();
+/// 初始化路由注册表。
+///
+/// # Errors
+///
+/// 如果无法获取路由注册表的写锁（例如锁中毒），返回 `AppError::InternalServerError`。
+pub fn init_route_registry() -> Result<(), AppError> {
+    {
+        let mut registry = ROUTE_REGISTRY
+            .write()
+            .map_err(|e| AppError::InternalServerError(format!("获取写锁失败: {e}")))?;
 
-    // inventory::iter() 会返回所有被收集的 RouteInfo 实例
-    for route_info in inventory::iter::<RouteInfo> {
-        let key = format!("{}:{}", route_info.method.to_uppercase(), route_info.path);
-        registry.insert(key, route_info.clone());
+        // inventory::iter() 会返回所有被收集的 RouteInfo 实例
+        for route_info in inventory::iter::<RouteInfo> {
+            let key = format!("{}:{}", route_info.method.to_uppercase(), route_info.path);
+            registry.insert(key, route_info.clone());
+        }
     }
+    Ok(())
 }
-
-// 获取路由权限
-pub fn get_route_permission(path: &str, method: &str) -> Option<&'static str> {
-    let registry = ROUTE_REGISTRY.read().unwrap();
-    let key = format!("{}:{}", method.to_uppercase(), path);
-    registry.get(&key).map(|r| r.permission)
-}
-
-// 获取所有注册的路由（用于调试或生成文档）
-pub fn get_all_routes() -> Vec<RouteInfo> {
-    let registry = ROUTE_REGISTRY.read().unwrap();
-    registry.values().cloned().collect()
+/// 获取所有已注册的路由信息。
+///
+/// # Errors
+///
+/// 如果路由注册表的读写锁被中毒，返回 `AppError::InternalServerError`。
+pub fn get_all_routes() -> Result<Vec<RouteInfo>, AppError> {
+    let registry = ROUTE_REGISTRY
+        .read()
+        .map_err(|e| AppError::InternalServerError(format!("读取路由注册表失败: {e}")))?;
+    Ok(registry.values().cloned().collect())
 }
 use route_macros::flush_crud_logs;
+
+use crate::config::AppError;
 
 flush_crud_logs!();

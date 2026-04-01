@@ -307,7 +307,7 @@ pub async fn get_posts_handler(
     Ok(ApiResponse::success(response, "成功").to_http_response())
 }
 
-/// 为获取上一篇和下一篇文章的处理函数添加OpenAPI文档
+/// `为获取上一篇和下一篇文章的处理函数添加OpenAPI文档`
 #[utoipa::path(
     summary = "获取上一篇和下一篇文章",
     tag="文章",
@@ -356,10 +356,10 @@ pub async fn get_prev_next_handler(
             .one(db_pool.as_ref())
     )
     .map_err(|e| {
-        log::error!("数据库操作失败: {}", e);
+        log::error!("数据库操作失败: {e}");
         AppError::DatabaseError("服务器异常，请联系管理员".to_string())
     })?;
-    log::info!("prev: {:?}, next: {:?}", prev, next);
+    log::info!("prev: {prev:?}, next: {next:?}");
     Ok(ApiResponse::success(
         PrevNextResult {
             prev_article: prev.map(to_response),
@@ -370,7 +370,7 @@ pub async fn get_prev_next_handler(
     .to_http_response())
 }
 
-/// 为创建文章的处理函数添加OpenAPI文档
+/// `为创建文章的处理函数添加OpenAPI文档`
 #[utoipa::path(
     summary = "创建文章",
     tag="文章",
@@ -389,7 +389,7 @@ pub async fn create_post_handler(
     post_data: web::Json<CreatePostRequest>, // 从认证中间件获取用户ID
                                              // user_id: web::ReqData<i32>,
 ) -> HttpResult {
-    log::info!("create_post_handler: {:?}", post_data);
+    log::info!("create_post_handler: {post_data:?}");
     let user_id = 1;
     // 验证输入
     if let Err(validation_errors) = post_data.validate() {

@@ -82,6 +82,7 @@ pub async fn chat_route(
                 &format!("用户已加入房间。在线用户: {user_count}"),
             )
             .await;
+        drop(server);
     }
     let db_pool_clone = db_pool.clone();
     // 处理消息流

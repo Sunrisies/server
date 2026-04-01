@@ -95,7 +95,7 @@ where
                             // 令牌有效，调用服务
                             let fut = self.service.call(req);
                             Box::pin(async move {
-                                let routes = get_all_routes();
+                                let routes = get_all_routes()?;
                                 log::info!("Registered {} routes:", routes.len());
                                 for route in routes {
                                     log::info!(
