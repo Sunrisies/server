@@ -4984,7 +4984,7 @@ dependencies = [
 
 [[package]]
 name = "web-server"
-version = "0.1.15"
+version = "0.1.19"
 dependencies = [
  "actix-cors",
  "actix-multipart",

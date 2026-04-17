@@ -9,7 +9,7 @@ REMOTE_HOST="api.sunrise1024.top"
 REMOTE_DIR="/home/docker/server"
 CONTAINER_NAME="web-server"
 PORT_MAPPING="22345:2345"
-VOLUME_MAPPING="/home/docker/server/web_server:/home/app/logs"
+VOLUME_MAPPING="/home/docker/server/web-server:/app/logs"
 KEEP_IMAGE_VERSIONS=2  # 本地保留最近2个版本
 
 # 颜色定义
@@ -570,6 +570,7 @@ docker run -d \
   -v VOLUME_MAPPING_PLACEHOLDER \
   -p PORT_MAPPING_PLACEHOLDER \
   --restart=always \
+  --network my_app_network \
   --name CONTAINER_NAME_PLACEHOLDER \
   IMAGE_NAME_PLACEHOLDER:NEW_VERSION_PLACEHOLDER
 
