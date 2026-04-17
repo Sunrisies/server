@@ -102,7 +102,7 @@ impl From<AppError> for ApiResponse<ValidationErrorJson> {
                 data: None,
             },
             AppError::ValidationError(msg) => {
-                println!("Validation errors:-- {:?}", msg.errors);
+                log::info!("Validation errors:-- {:?}", msg.errors);
                 ApiResponse {
                     code: 422,
                     message: "校验失败".to_string(),

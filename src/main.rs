@@ -50,9 +50,10 @@ async fn main() -> Result<()> {
     email_verification_manager.start_cleanup_task();
 
     write_to_file(); // api_doc生成文件
-    println!(
+    log::info!(
         "Server running on {}:{}",
-        CONFIG.server.host, CONFIG.server.port
+        CONFIG.server.host,
+        CONFIG.server.port
     );
     let server = HttpServer::new(move || {
         let cors = Cors::default()
@@ -106,8 +107,8 @@ async fn main() -> Result<()> {
     server
         .bind((CONFIG.server.host.as_str(), CONFIG.server.port))?
         .on_connect(move |conn, addr| {
-            println!("New connection: {conn:?}");
-            println!("Remote address: {addr:?}");
+            log::info!("New connection: {conn:?}");
+            log::info!("Remote address: {addr:?}");
         })
         .run()
         .await?;

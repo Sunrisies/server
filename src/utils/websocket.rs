@@ -43,7 +43,7 @@ impl Default for ChatServer {
 }
 impl ChatServer {
     pub fn new() -> Self {
-        println!("Chat server started");
+        log::info!("Chat server started");
         Self {
             sessions: HashMap::new(),
         }

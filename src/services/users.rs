@@ -18,7 +18,7 @@ impl UserService {
         {
             Ok(data) => Ok(HttpResponse::Ok().json(data)),
             Err(e) => {
-                println!("Database query error: {}", e);
+                log::error!("Database query error: {}", e);
                 Err(AppError::DatabaseConnectionError(e.to_string()))
             }
         }
