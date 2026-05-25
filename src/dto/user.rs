@@ -8,41 +8,48 @@ use validator::{Validate, ValidationErrors};
 #[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
 pub struct PasswordLogin {
     #[validate(length(min = 1, max = 100))]
+    #[schema(example = "admin")]
     pub account: String,
 
     #[validate(length(min = 6, max = 100))]
+    #[schema(example = "123456")]
     pub password: String,
 }
 
 #[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
 pub struct EmailLogin {
     #[validate(email)]
+    #[schema(example = "user@example.com")]
     pub email: String,
 
     #[validate(length(min = 6, max = 6, message = "验证码格式错误"))]
-    #[schema(default = "123456")]
+    #[schema(example = "123456")]
     pub code: String,
 }
 
 #[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
 pub struct PhoneLogin {
     #[validate(regex(path = "*RE_PHONE", message = "手机号格式错误"))]
+    #[schema(example = "13800138000")]
     pub phone: String,
 
     #[validate(length(min = 6, max = 6, message = "验证码格式错误"))]
-    #[schema(default = "123456")]
+    #[schema(example = "123456")]
     pub code: String,
 }
 
 #[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
 pub struct OAuthLogin {
     #[validate(length(min = 1))]
+    #[schema(example = "github")]
     pub provider: String,
 
     #[validate(length(min = 1))]
+    #[schema(example = "123456789")]
     pub openid: String,
 
     #[validate(length(min = 1))]
+    #[schema(example = "gho_xxxxxxxxxxxx")]
     pub access_token: String,
 }
 
@@ -92,13 +99,17 @@ lazy_static! {
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RegisterResponse {
     #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
+    #[schema(example = "chao yang")]
     pub user_name: String,
     #[validate(length(min = 6, max = 100, message = "密码长度必须在6到100之间"))]
+    #[schema(example = "123456")]
     pub pass_word: String,
 }
 #[derive(Serialize, Deserialize, Debug, ToSchema)]
 pub struct ValidationErrorItem {
+    #[schema(example = "user_name")]
     pub name: String,
+    #[schema(example = "用户名长度必须在5到100之间")]
     pub error: String,
 }
 
