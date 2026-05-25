@@ -8,7 +8,7 @@ pub mod rooms;
 pub mod tags;
 pub mod upload;
 pub mod users;
-mod version;
+pub mod version;
 use actix_web::web;
 
 use crate::routes::version::get_version;

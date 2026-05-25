@@ -18,7 +18,7 @@ impl_from_request!(CreateTagRequest => tags::ActiveModel {
     name
 });
 
-#[derive(Debug, Serialize, FromQueryResult)]
+#[derive(Debug, Serialize, ToSchema, FromQueryResult)]
 pub struct TagCloudItem {
     pub id: i32,
     pub name: String,

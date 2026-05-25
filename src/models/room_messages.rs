@@ -3,8 +3,9 @@
 use crate::utils::fmt_beijing;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, ToSchema)]
 #[sea_orm(table_name = "room_messages")]
 pub struct Model {
     #[sea_orm(primary_key)]
@@ -18,9 +19,11 @@ pub struct Model {
     pub file_name: Option<String>,
     pub file_size: Option<i32>,
     pub retention_hours: Option<i32>,
+    #[schema(value_type = String, format = DateTime)]
     #[sea_orm(default_value_t = DateTimeUtc::default())]
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
+    #[schema(value_type = String, format = DateTime)]
     #[sea_orm(default_value_t = DateTimeUtc::default())]
     #[serde(serialize_with = "fmt_beijing")]
     pub expires_at: DateTimeUtc,

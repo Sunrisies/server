@@ -9,7 +9,7 @@ pub struct ImageUploadRequest {
     pub file_type: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ImageUploadResponse {
     pub id: i32,
     pub url: String,
@@ -17,6 +17,7 @@ pub struct ImageUploadResponse {
     pub filename: String,
     pub size: i64,
     pub human_readable_size: String,
+    #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,
 }

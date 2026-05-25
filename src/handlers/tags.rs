@@ -26,6 +26,17 @@ crud_entity!({
 
 });
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/tags/count",
+    tag = "标签管理",
+    summary = "获取标签使用量统计",
+    description = "返回每个标签关联的文章数量，按使用量降序排列",
+    responses(
+        (status = 200, description = "获取成功", body = crate::ApiResponse<Vec<TagCloudItem>>),
+        (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+    )
+)]
 pub async fn get_tags_with_count_handler(db_pool: web::Data<DatabaseConnection>) -> HttpResult {
     let tag_counts = tags::Entity::find()
         .column_as(tags::Column::Id, "id")
@@ -51,7 +62,23 @@ pub async fn get_tags_with_count_handler(db_pool: web::Data<DatabaseConnection>)
     Ok(ApiResponse::success(tag_counts, "成功").to_http_response())
 }
 
-/// 通过tag获取文章列表
+#[utoipa::path(
+    get,
+    path = "/api/v1/tags/{id}/posts",
+    tag = "标签管理",
+    summary = "根据标签获取文章列表",
+    description = "根据标签ID获取该标签下的所有文章（分页）",
+    params(
+        ("id" = i32, Path, description = "标签ID"),
+        ("page" = Option<u64>, Query, description = "页码，默认1"),
+        ("limit" = Option<u64>, Query, description = "每页数量，默认10")
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = crate::ApiResponse<PaginatedResp<PostResponse>>),
+        (status = 404, description = "标签不存在", body = crate::ApiResponse<crate::EmptyResponse>),
+        (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+    )
+)]
 pub async fn get_posts_by_tag_handler(
     db_pool: web::Data<DatabaseConnection>,
     path: web::Path<i32>, // 标签ID

@@ -25,29 +25,37 @@ impl<'a> OpenApiGenerator<'a> {
         }
     }
 
-    // pub fn generate_create_doc(&self, create_request_type: &Ident) -> proc_macro2::TokenStream {
-    //     let entity_str = self.entity.to_string();
-    //     let tag = self.get_primary_tag();
-    //     let route_path = self.route_prefix.value();
+    pub fn generate_create_doc(&self, create_request_type: &Ident) -> proc_macro2::TokenStream {
+        if !self.should_generate() {
+            return quote! {};
+        }
 
-    //     quote! {
-    //         #[utoipa::path(
-    //             post,
-    //             summary = format!("创建{}", #entity_str),
-    //             path = #route_path,
-    //             tag = #tag,
-    //             request_body(content = #create_request_type, description = format!("创建{}的请求数据", #entity_str)),
-    //             responses(
-    //                 // (status = 200, description = "创建成功", body = ApiResponse<#Self.entity::Model>),
-    //                 // (status = 400, description = "请求数据无效", body = ApiResponse<()>),
-    //                 // (status = 500, description = "服务器内部错误", body = ApiResponse<()>)
-    //             ),
-    //             security(
-    //                 ("bearer_auth" = [])
-    //             )
-    //         )]
-    //     }
-    // }
+        let entity = self.entity;
+        let summary = self.get_summary(&format!("创建{}", self.openapi_summary.value()));
+        let description = self.get_description(&format!("创建新的{}", self.openapi_summary.value()));
+        let tag = self.get_tag();
+        let route_path = self.route_prefix.value();
+        let deprecated_attr = self.get_deprecated_attr();
+
+        quote! {
+            #[utoipa::path(
+                post,
+                path = #route_path,
+                tag = #tag,
+                summary = #summary,
+                description = #description #deprecated_attr,
+                request_body(content = #create_request_type),
+                responses(
+                    (status = 200, description = "创建成功", body = crate::ApiResponse<#entity::Model>),
+                    (status = 400, description = "请求参数错误", body = crate::ApiResponse<crate::EmptyResponse>),
+                    (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+                ),
+                security(
+                    ("bearer_auth" = [])
+                )
+            )]
+        }
+    }
     /// 检查是否应该生成文档
     pub fn should_generate(&self) -> bool {
         !self.config.map(|c| c.hidden).unwrap_or(false)

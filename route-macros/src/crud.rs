@@ -66,11 +66,18 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     for operation in &operations {
         match operation {
             CrudOperation::Create => {
+                let create_openapi_gen = OpenApiGenerator::new(
+                    entity,
+                    route_prefix,
+                    &openapi_summary,
+                    config.openapi_create.as_ref(),
+                );
                 create_code = generate_create_code(
                     entity,
                     route_prefix,
                     permission_prefix,
                     &config.create_request_type,
+                    &create_openapi_gen,
                 );
                 operation_logs.push(format!(
                     "创建操作: create_{}_handler",
@@ -297,6 +304,7 @@ fn generate_create_code(
     route_prefix: &LitStr,
     permission_prefix: &LitStr,
     create_request_type: &Option<Ident>,
+    openapi_gen: &OpenApiGenerator,
 ) -> proc_macro2::TokenStream {
     let create_fn = format_ident!("create_{}", entity.to_string().to_lowercase());
     let create_handler = format_ident!("create_{}_handler", entity.to_string().to_lowercase());
@@ -314,6 +322,7 @@ fn generate_create_code(
             .into();
         }
     };
+    let openapi_doc = openapi_gen.generate_create_doc(create_request_type);
 
     quote! {
         use validator::Validate;
@@ -337,6 +346,7 @@ fn generate_create_code(
             Ok(model)
         }
 
+        #openapi_doc
         #[crate::route_permission(
             path = #full_path,
             method = "post",

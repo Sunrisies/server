@@ -34,7 +34,7 @@ pub struct QiNiuSettings {
 // 配置结构
 
 // 上传结果
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct UploadResult {
     pub url: String,
     pub key: String,

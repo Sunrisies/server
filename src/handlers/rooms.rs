@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ApiResponse, models::rooms};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct CreateRoomRequest {
     pub name: String,
     pub description: Option<String>,
@@ -22,6 +22,19 @@ pub struct RoomResponse {
     pub user_count: i32,
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/rooms",
+    tag = "聊天室",
+    summary = "创建聊天室",
+    description = "创建一个新的聊天室",
+    request_body(content = CreateRoomRequest),
+    responses(
+        (status = 200, description = "创建成功", body = crate::ApiResponse<crate::models::rooms::Model>),
+        (status = 400, description = "请求参数错误", body = crate::ApiResponse<crate::EmptyResponse>),
+        (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+    )
+)]
 pub async fn create_room_handler(
     db: web::Data<DatabaseConnection>,
     room_data: web::Json<CreateRoomRequest>,
@@ -54,6 +67,20 @@ pub async fn create_room_handler(
     Ok(ApiResponse::success(room, "创建房间成功").to_http_response())
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/rooms/{room_name}",
+    tag = "聊天室",
+    summary = "获取聊天室信息",
+    description = "根据房间名称获取聊天室信息",
+    params(
+        ("room_name" = String, Path, description = "房间名称")
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = crate::ApiResponse<Option<crate::models::rooms::Model>>),
+        (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+    )
+)]
 pub async fn get_room_handler(
     db_pool: web::Data<DatabaseConnection>,
     room_name: web::Path<String>,

@@ -4,6 +4,21 @@ use sea_orm::{EntityTrait, prelude::*};
 
 use crate::ApiResponse;
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/rooms/{room_id}/messages",
+    tag = "聊天室",
+    summary = "获取聊天室消息",
+    description = "根据房间ID获取该聊天室的所有消息",
+    params(
+        ("room_id" = i32, Path, description = "房间ID")
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = crate::ApiResponse<Vec<crate::models::room_messages::Model>>),
+        (status = 400, description = "房间ID格式错误", body = crate::ApiResponse<crate::EmptyResponse>),
+        (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+    )
+)]
 pub async fn get_room_messages_handler(
     db: web::Data<DatabaseConnection>,
     room_id: web::Path<String>,

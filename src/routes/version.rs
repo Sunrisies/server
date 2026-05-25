@@ -3,7 +3,7 @@ use crate::{ApiResponse, HttpResult, config::AppError};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 struct VersionInfo {
     name: String,
     version: String,
@@ -21,6 +21,17 @@ struct VersionInfo {
     environment: String,
     language: String,
 }
+#[utoipa::path(
+    get,
+    path = "/api/v1/version",
+    tag = "系统信息",
+    summary = "获取版本信息",
+    description = "返回当前服务的版本、构建时间、Git 提交信息等",
+    responses(
+        (status = 200, description = "获取成功", body = crate::ApiResponse<crate::routes::version::VersionInfo>),
+        (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
+    )
+)]
 pub async fn get_version() -> HttpResult {
     // 读取文件内容
     let version_content = fs::read_to_string(".docker/version.json").map_err(|e| {

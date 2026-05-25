@@ -50,6 +50,7 @@ pub struct CrudEntityConfig {
     pub custom_read_fn: Option<Ident>,                // 新增：自定义详情查询函数名
     // OpenAPI 配置
     pub openapi_summary: Option<LitStr>, // 自定义摘要
+    pub openapi_create: Option<OpenApiConfig>,
     pub openapi_read: Option<OpenApiConfig>,
     pub openapi_list: Option<OpenApiConfig>,
     pub openapi_delete: Option<OpenApiConfig>,
@@ -69,6 +70,7 @@ impl Parse for CrudEntityConfig {
         let mut custom_list_fn = None;
         let mut custom_read_fn = None;
         let mut openapi_summary = None;
+        let mut openapi_create = None;
         let mut openapi_read = None;
         let mut openapi_list = None;
         let mut openapi_delete = None;
@@ -158,6 +160,10 @@ impl Parse for CrudEntityConfig {
                     let value: LitStr = content.parse()?;
                     openapi_summary = Some(value);
                 }
+                "openapi_create" => {
+                    let config = parse_openapi_config(&&content)?;
+                    openapi_create = Some(config);
+                }
                 "openapi_read" => {
                     let config = parse_openapi_config(&&content)?;
                     openapi_read = Some(config);
@@ -193,6 +199,7 @@ impl Parse for CrudEntityConfig {
             custom_list_fn,
             custom_read_fn,
             openapi_summary,
+            openapi_create,
             openapi_read,
             openapi_list,
             openapi_delete,
