@@ -18,8 +18,8 @@ impl UserService {
         {
             Ok(data) => Ok(HttpResponse::Ok().json(data)),
             Err(e) => {
-                log::error!("Database query error: {}", e);
-                Err(AppError::DatabaseConnectionError(e.to_string()))
+                log::error!("数据库查询错误(已隐藏): {:?}", e);
+                Err(AppError::DatabaseConnectionError(String::new()))
             }
         }
     }

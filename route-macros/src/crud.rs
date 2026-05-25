@@ -251,9 +251,9 @@ fn generate_read_code(
                     Ok(result) => Ok(result),
                     Err(e) => {
                         log::error!("自定义查询失败: {}", e);
-                        Ok(ApiResponse::from(AppError::DatabaseConnectionError(
+                        Err(AppError::DatabaseConnectionError(
                             "查询失败".to_string(),
-                        )).to_http_response())
+                        ))
                     }
                 }
             }
@@ -286,10 +286,7 @@ fn generate_read_code(
                 let id = path.into_inner();
                 match #get_fn(db.get_ref(), id).await {
                     Ok(data) => Ok(ApiResponse::success(data,"获取成功").to_http_response()),
-                    Err(AppError::NotFound(msg)) => {
-                        Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse,&msg).to_http_response())
-                    },
-                    _ => todo!()
+                    Err(e) => Err(e),
                 }
             }
         }
@@ -352,12 +349,7 @@ fn generate_create_code(
             log::info!("Creating new {}", stringify!(#entity));
             match #create_fn(db.get_ref(), data.into_inner()).await {
                 Ok(category) => Ok(ApiResponse::success(category, "添加成功").to_http_response()),
-                Err(AppError::DatabaseConnectionError(msg)) => {
-                    Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse,&msg).to_http_response())
-                }
-                Err(e) => {
-                    Ok(ApiResponse::from(e).to_http_response())
-                }
+                Err(e) => Err(e),
             }
         }
     }
@@ -389,13 +381,10 @@ fn generate_delete_code(
                 .map_err(|e| AppError::DatabaseError(e.to_string()))?
                 .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))?;
             match entity.delete(db).await {
-                Ok(_res) => Ok( ApiResponse::<EmptyResponse>::success(EmptyResponse,"删除成功").to_http_response()),
+                Ok(_res) => Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse,"删除成功").to_http_response()),
                 Err(e) => {
                     println!("删除失败: {}", e);
-                    Ok(
-                        ApiResponse::from(AppError::DatabaseConnectionError(db_err_map(e).to_owned()))
-                            .to_http_response(),
-                    )
+                    Err(AppError::DatabaseConnectionError(db_err_map(e).to_owned()))
                 }
             }
         }
@@ -443,10 +432,9 @@ fn generate_list_code(
             Ok(t) => t,
             Err(e) => {
                 println!("查询{}总数失败: {}",stringify!(#full_path),e);
-                return Ok(ApiResponse::from(AppError::DatabaseConnectionError(
+                return Err(AppError::DatabaseConnectionError(
                     "获取失败".to_string(),
-                ))
-                .to_http_response());
+                ));
             }
         };
 
@@ -454,10 +442,9 @@ fn generate_list_code(
             Ok(list) => list,
             Err(e) => {
                 println!("查询{}列表失败: {}",stringify!(#full_path), e);
-                return Ok(ApiResponse::from(AppError::DatabaseConnectionError(
+                return Err(AppError::DatabaseConnectionError(
                     "获取列表失败".to_string(),
-                ))
-                .to_http_response());
+                ));
             }
         };
         log::info!("data:{:?}", data);

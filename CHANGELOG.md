@@ -3,56 +3,221 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 ---
+
 ## [unreleased]
 
-### Documentation
+### Features
 
-- **architecture**: 完善项目架构文档和图表 - (2025-12-02)
-  - 更新 `architecture_diagram.md` 添加详细的Mermaid架构图
-    - 系统整体架构图
-    - 核心模块关系图
-    - 数据库ER图
-    - API架构图
-    - 中间件处理流程图
-    - 请求处理生命周期图
-    - 权限系统架构图
-    - 文件上传流程图
-    - WebSocket聊天架构图
-    - 数据库连接池管理图
-  - 重写 `arch.md` 提供完整的架构文档
-    - 详细的项目结构说明
-    - 各层职责和依赖关系
-    - 核心功能模块详解
-    - 认证授权系统说明
-    - 数据流和权限验证流程
-    - 关键配置说明
-    - 安全措施和性能优化
-    - 错误处理和日志系统
-    - API文档和部署指南
-  - 完全重写 `README.md` 使其更专业和全面
-    - 添加技术栈徽章
-    - 详细的功能特性列表
-    - 完整的快速开始指南
-    - 清晰的项目结构说明
-    - API端点文档
-    - 配置说明和开发指南
-    - 部署和测试说明
-  - 新增 `ARCHITECTURE_OVERVIEW.md` 架构总览文档
-    - 系统概览和核心架构层次
-    - 典型请求流程说明
-    - 认证授权系统详解
-    - 数据库设计要点
-    - API设计原则
-    - 性能优化策略
-    - 安全措施说明
-    - 学习资源链接
+- **ops**: 更新 Docker 卷路径并添加网络配置
+- **logging**: 将 `println` 替换为 `log` 日志记录
+
+---
+
+## [0.1.19] - 2026-04-14
 
 ### Miscellaneous Chores
 
-- initialize basic structure for the repo - ([2436bec](https://github.com/tyrchen/qdrant-lib/commit/2436bec4a02caac64f6c1f97ca79b6ce745b4f53)) - Tyr Chen
+- bump version to 0.1.19 [deploy]
 
-### Other
+---
 
-- init the project and add the assets - ([6a3ca0a](https://github.com/tyrchen/qdrant-lib/commit/6a3ca0a900451c55969cc8dec20afb5351d86599)) - Tyr Chen
+## [0.1.18] - 2026-04-14
+
+### Build
+
+- 升级依赖版本并优化 CORS 配置
+- 更新版本并优化构建脚本
+
+### Features
+
+- **upload**: 添加 multipart 错误处理并更新依赖
+- **images**: 实现图片上传数据库存储功能
+- **images**: 实现图片上传 API 响应和 URL 构建功能
+
+### Refactoring
+
+- 更新依赖和代码风格
+- 优化代码格式和错误处理
+
+---
+
+## [0.1.14] - 2026-03-16
+
+### Features
+
+- 新增上传接口，更新依赖包版本
+- **openapi**: 优化删除操作的 OpenApi 文档生成逻辑并移除未使用的代码
+- **openapi**: 添加删除操作的 OpenApi 文档生成支持
+- **openapi**: 添加自定义摘要支持到 CRUD 实体配置
+- **openapi**: 添加生成列表查询文档的功能并更新相关处理函数
+- **openapi**: 添加 OpenApiConfig 结构体及相关解析逻辑以支持自定义 API 文档配置
+- 添加 EmptyResponse 结构体并更新相关处理函数以支持无返回数据的 API 响应
+- 更新分类和标签的路由前缀为 `/api/v1`
+
+### Fixes
+
+- 更新构建阶段的 Rust 版本并修正远程主机地址
+
+---
+
+## [0.1.13] - 2025-12-13
+
+### Features
+
+- 为文章列表接口添加标签过滤功能
+- 添加文章分类筛选功能并更新依赖
+- **refactor**: 提取请求转换为通用宏，优化 DTO 实现
+- **validation**: 添加 JSON 错误处理和验证，优化错误提示
+- **refactor**: 提取唯一性检查为通用宏，优化 CRUD 代码结构
+- **validation**: 添加数据验证和唯一性检查，优化 CRUD 操作
+
+### Miscellaneous Chores
+
+- bump version to 0.1.13 [deploy]
+- bump version to 0.1.13 and disable tests in dev
+
+---
+
+## [0.1.11] - 2025-12-06
+
+### Features
+
+- **links**: 添加外部链接管理功能，包含 CRUD 操作和数据库表结构
+- **version**: 添加版本信息 API 端点，优化 Docker 构建缓存并移除调试日志
+
+---
+
+## [0.1.10] - 2025-12-05
+
+### Features
+
+- **tags**: 优化标签相关查询逻辑，添加分类信息并重构 SQL 查询
+
+---
+
+## [0.1.9] - 2025-12-05
+
+### Features
+
+- **posts**: 添加上一篇和下一篇文章的处理函数及 OpenAPI 文档
+- **posts**: 添加时间轴和文章详情的处理函数及 OpenAPI 文档
+- **posts**: 添加获取所有文章列表的接口及相关处理逻辑
+- **config**: 重构七牛云和邮件配置结构，提取为独立模块并优化字段命名
+- **error**: 重构错误处理逻辑，简化错误码和响应格式
+- **auth**: 重构 JWT 认证逻辑，统一错误处理和配置管理
+- **config**: 重构配置管理，使用 `config` crate 集中管理环境变量
+- **routes**: 模块化 API 路由结构
+- **tests**: 添加用户认证测试套件和测试文档
+
+### Fixes
+
+- **ci**: 移除 CI 流程中的 Rust 测试步骤
+- **email**: 更新邮件路由路径和导入
+
+### Documentation
+
+- **architecture**: 完善项目架构文档和图表
+  - 新增 `architecture_diagram.md`（Mermaid 架构图）
+  - 重写 `arch.md` 完整架构文档
+  - 重写 `README.md` 专业全面版本
+  - 新增 `ARCHITECTURE_OVERVIEW.md` 架构总览
+
+---
+
+## [0.1.3] - 2025-10-22
+
+### Features
+
+- **email**: 添加邮件验证服务和路由
+- **tests**: 为文章管理添加单元测试
+- **posts**: 实现文章创建、更新、删除功能及路由配置
+- **deps**: 更新依赖版本
+
+### Refactoring
+
+- 重命名项目为 `web-server`，更新 CORS 配置
+
+---
+
+## [0.1.2] - 2025-10-21
+
+### Miscellaneous Chores
+
+- 优化 `dev.sh` 脚本
+
+---
+
+## [0.1.1] - 2025-10-21
+
+### Features
+
+- **chat**: 添加聊天室消息处理和 WebSocket 房间管理优化
+- **rooms**: 添加 UUID 支持和房间创建验证改进
+- **chat**: 添加聊天室系统，支持 WebSocket 和消息持久化
+- **tags**: 通过标签获取文章列表的处理函数及路由
+- **tags**: 新增标签使用量统计功能
+- **posts**: 添加上一篇和下一篇文章查询功能
+- **posts**: 添加自定义查询类型和函数以支持 CRUD 实体配置
+- **posts**: 添加文章 CRUD 和分页结构
+
+### Build
+
+- 添加 Dockerfile 和构建脚本，配置 Docker 镜像构建和部署流程
+
+---
+
+## [0.1.0] - 2025-10-21
+
+### Features
+
+- **users**: 用户 CRUD 操作列表、路由处理优化
+- **users**: 重构用户处理函数和服务层，使用 CRUD 宏
+- **auth**: 添加基于角色的权限系统
+- **auth**: 实现认证中间件
+- **auth**: 添加 JWT 令牌生成和 Cookie 处理
+- **auth**: 实现多种登录方式
+- **auth**: 添加 argon2id 密码哈希
+- **openapi**: 添加 OpenAPI 文档生成器
+- **openapi**: 增强 CRUD 日志记录和标签读取操作
+- **openapi**: 生成列表查询文档，自定义 API 文档配置
+- **openapi**: 更新用户路由前缀为 `/api/v1/users`
+- **pagination**: 重构分页查询逻辑，使用 SeaORM 的 PaginatorTrait
+- **route-macros**: 提取路由宏并模块化
+- **route-macros**: 添加路由权限宏和注册器
+- **categories**: 重构分类/标签处理器，使用宏实现 CRUD 操作
+- **tags**: 标签 CRUD 和删除操作
+- **tags**: 添加 CreateTagRequest DTO
+- **SSE**: 添加 SSE 支持与事件广播
+- **WebSocket**: 添加 WebSocket 支持与 echo 端点
+- **error**: 增强分类处理器错误处理和数据库错误映射
+- **categories**: 添加分类相关处理器
+- **models**: 添加分类、标签和文章模块
+- **config**: 添加日志配置和 nu-ansi-term 依赖
+- **config**: 添加环境变量和 sea-orm 数据库配置
+- **API**: 更新用户注册和获取路由
+- **API**: 添加 OpenAPI 文档生成函数
+- **API**: 添加分类 API 文档和验证
+- **API**: 增强 API 文档和时间格式化
+
+### Build
+
+- 添加构建配置文件和 Dockerfile
+- 更新构建工作流，修复分支推送配置
+
+### Refactoring
+
+- 重构项目结构、更新依赖、添加路由处理功能
+- 重构路由结构并添加验证
+- 更新用户请求和响应结构，改进数据库连接池配置
+- 重构数据库连接池，增强用户模型功能
+
+### Miscellaneous Chores
+
+- 初始化项目结构，添加 actix-web 框架
+- 更新 README.md，添加 Rust 服务器相关信息
+- 删除 `postgres.tar` 文件
+- 添加 .gitignore 规则
+
+---
 
 <!-- generated by git-cliff -->

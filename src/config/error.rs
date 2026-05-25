@@ -53,6 +53,44 @@ pub enum AppError {
 }
 
 impl AppError {
+    /// 返回给前端的用户友好错误消息（5xx 统一隐藏技术细节）
+    pub fn user_message(&self) -> String {
+        match self {
+            // 4xx — 由 handler 构造，通常是用户友好消息，直接返回
+            AppError::Unauthorized(msg)
+            | AppError::Forbidden(msg)
+            | AppError::InvalidCredentials(msg)
+            | AppError::TokenExpired(msg)
+            | AppError::TokenInvalid(msg)
+            | AppError::BadRequest(msg)
+            | AppError::UnprocessableEntity(msg)
+            | AppError::NotFound(msg)
+            | AppError::AlreadyExists(msg)
+            | AppError::Conflict(msg)
+            | AppError::RateLimited(msg)
+            | AppError::FileTooLarge(msg)
+            | AppError::UnsupportedFileType(msg)
+            | AppError::UploadFailed(msg)
+            | AppError::NotImplemented(msg)
+            | AppError::MaintenanceMode(msg)
+            | AppError::MultipartError(msg) => msg.clone(),
+
+            // 5xx — 统一隐藏技术细节
+            AppError::DatabaseError(_)
+            | AppError::DatabaseTimeout(_)
+            | AppError::DatabaseConnectionError(_)
+            | AppError::ExternalServiceError(_)
+            | AppError::EmailServiceError(_)
+            | AppError::SearchServiceError(_)
+            | AppError::StorageServiceError(_)
+            | AppError::InternalServerError(_)
+            | AppError::ConfigurationError(_)
+            | AppError::EncryptionError(_) => "服务器内部错误，请稍后再试".to_string(),
+
+            // ValidationError 特殊处理
+            AppError::ValidationError(_) => "请求参数校验失败".to_string(),
+        }
+    }
     // 获取错误码
     pub fn code(&self) -> i32 {
         self.status_code().as_u16() as i32
@@ -101,50 +139,22 @@ impl AppError {
     }
     // 转换为 ApiResponse
     pub fn to_response(&self) -> ApiResponse<serde_json::Value> {
+        // 5xx 错误自动记录详细日志供运维排查
+        if self.status_code().as_u16() >= 500 {
+            log::error!("服务器错误: {:?}", self);
+        }
         ApiResponse {
             code: self.code(),
-            message: self.to_string(),
+            message: self.user_message(),
             data: self.details(),
         }
     }
 }
 
-// 实现 Display trait 用于错误消息显示
+// Display 用于日志，直接输出 Debug 信息
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AppError::Unauthorized(msg) => write!(f, "未授权: {}", msg),
-            AppError::Forbidden(msg) => write!(f, "禁止访问: {}", msg),
-            AppError::InvalidCredentials(msg) => write!(f, "无效的凭据: {}", msg),
-            AppError::TokenExpired(msg) => write!(f, "令牌已过期: {}", msg),
-            AppError::TokenInvalid(msg) => write!(f, "无效的令牌: {}", msg),
-            AppError::BadRequest(msg) => write!(f, "错误的请求: {}", msg),
-
-            AppError::ValidationError(error) => write!(f, "验证错误: {:?}", error),
-            AppError::UnprocessableEntity(msg) => write!(f, "无法处理的实体: {}", msg),
-            AppError::NotFound(msg) => write!(f, "未找到: {}", msg),
-            AppError::AlreadyExists(msg) => write!(f, "已存在: {}", msg),
-            AppError::Conflict(msg) => write!(f, "冲突: {}", msg),
-            AppError::RateLimited(msg) => write!(f, "请求过于频繁: {}", msg),
-            AppError::FileTooLarge(msg) => write!(f, "文件太大: {}", msg),
-            AppError::UnsupportedFileType(msg) => write!(f, "不支持的文件类型: {}", msg),
-            AppError::UploadFailed(msg) => write!(f, "上传失败: {}", msg),
-            AppError::DatabaseError(msg) => write!(f, "数据库错误: {}", msg),
-            AppError::DatabaseTimeout(msg) => write!(f, "数据库超时: {}", msg),
-            AppError::DatabaseConnectionError(msg) => {
-                write!(f, "数据库连接错误: {}", msg)
-            }
-            AppError::ExternalServiceError(msg) => write!(f, "外部服务错误: {}", msg),
-            AppError::EmailServiceError(msg) => write!(f, "邮箱服务错误: {}", msg),
-            AppError::SearchServiceError(msg) => write!(f, "搜索服务错误: {}", msg),
-            AppError::StorageServiceError(msg) => write!(f, "存储服务错误: {}", msg),
-            AppError::InternalServerError(msg) => write!(f, "服务器内部错误: {}", msg),
-            AppError::ConfigurationError(msg) => write!(f, "配置错误: {}", msg),
-            AppError::EncryptionError(msg) => write!(f, "加密错误: {}", msg),
-            AppError::NotImplemented(msg) => write!(f, "未实现: {}", msg),
-            AppError::MaintenanceMode(msg) => write!(f, "维护模式: {}", msg),
-            AppError::MultipartError(msg) => write!(f, "Multipart 错误: {}", msg), // 新增
-        }
+        write!(f, "{:?}", self)
     }
 }
 
@@ -155,29 +165,34 @@ impl ResponseError for AppError {
     }
 }
 
-// 从 Diesel 错误转换
+// 从 SeaORM 数据库错误转换
 impl From<sea_orm::DbErr> for AppError {
     fn from(err: sea_orm::DbErr) -> Self {
-        AppError::DatabaseError(err.to_string())
+        log::error!("数据库错误(已隐藏): {:?}", err);
+        AppError::DatabaseError(String::new())
     }
 }
 
-// 从其他常见错误类型转换
+// 从 IO 错误转换
 impl From<std::io::Error> for AppError {
     fn from(error: std::io::Error) -> Self {
-        AppError::InternalServerError(format!("IO error: {}", error))
+        log::error!("IO错误(已隐藏): {:?}", error);
+        AppError::InternalServerError(String::new())
     }
 }
-/// actix_multipart
+
+/// actix_multipart 错误转换
 impl From<actix_multipart::MultipartError> for AppError {
     fn from(error: actix_multipart::MultipartError) -> Self {
-        AppError::UploadFailed(format!("Multipart error: {}", error))
+        log::error!("Multipart错误(已隐藏): {:?}", error);
+        AppError::UploadFailed("文件上传失败，请重试".to_string())
     }
 }
 
 impl From<argon2::password_hash::Error> for AppError {
     fn from(error: argon2::password_hash::Error) -> Self {
-        AppError::EncryptionError(format!("Password hashing error: {}", error))
+        log::error!("密码加密错误(已隐藏): {:?}", error);
+        AppError::InternalServerError(String::new())
     }
 }
 

@@ -188,7 +188,7 @@ impl PostService {
         if let Some(content) = post_data.content {
             active_post.content = Set(content.clone());
             let size = i32::try_from(content.len())
-                .map_err(|e| AppError::BadRequest(format!("文章内容过长: {}", e)))?;
+                .map_err(|_| AppError::BadRequest("文章内容过长".to_string()))?;
             active_post.size = Set(size);
         }
         if let Some(markdowncontent) = post_data.markdowncontent {

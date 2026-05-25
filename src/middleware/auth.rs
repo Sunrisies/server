@@ -1,17 +1,13 @@
-use crate::{get_all_routes, utils::perm_cache::ROLE_PERMS};
 use actix_web::{
-    Error,
+    Error, HttpMessage,
     dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
 };
-use sea_orm::DatabaseConnection;
 use std::{
     future::{Future, Ready, ready},
     pin::Pin,
 };
 
 use crate::config::AppError;
-
-pub type DbPool = DatabaseConnection;
 pub struct Auth;
 
 impl<S, B> Transform<S, ServiceRequest> for Auth
@@ -47,16 +43,25 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        let path = req.path().to_string(); // 克隆 path
-        // 完全匹配的路径
+        let path = req.path().to_string();
+
+        // 如果携带了 access_token cookie，尝试解析并注入用户信息
+        // （供 handlers 中获取当前登录用户使用）
+        if let Some(cookie) = req.cookie("access_token")
+            && let Ok(claims) = crate::utils::jwt::decode_jwt(cookie.value())
+        {
+            log::info!("用户已登录: {} ({})", claims.user_name, claims.user_uuid);
+            req.extensions_mut().insert(claims);
+        }
+
+        // 完全匹配的公开路径（无需认证）
         let exact_paths = [
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/sse",
             "/api/v1/ws",
         ];
-        // 前缀匹配的路径
-
+        // 前缀匹配的公开路径（无需认证）
         let prefix_paths = [
             "/api/v1/tags",
             "/api/v1/posts",
@@ -72,53 +77,26 @@ where
             || prefix_paths.iter().any(|&prefix| path.starts_with(prefix));
 
         if is_public {
-            // 公开路径，直接调用服务
+            // 公开路径，直接放行
             let fut = self.service.call(req);
             Box::pin(async move {
                 let res = fut.await?;
                 Ok(res)
             })
         } else {
-            // 需要认证的路径，先检查cookie
-            let cookie_result = req.cookie("access_token").ok_or_else(|| {
-                log::error!("access_token not found, path: {}", path);
-                AppError::Unauthorized("access_token not found".to_string())
-            });
-            match cookie_result {
-                Ok(cookie) => {
-                    let token = cookie.value();
-
-                    // 验证令牌
-                    match crate::utils::jwt::decode_jwt(token) {
-                        Ok(claims) => {
-                            log::info!("s: {:?}", claims);
-                            // 令牌有效，调用服务
-                            let fut = self.service.call(req);
-                            Box::pin(async move {
-                                let routes = get_all_routes()?;
-                                log::info!("Registered {} routes:", routes.len());
-                                for route in routes {
-                                    log::info!(
-                                        "  {} {} -> {}",
-                                        route.method,
-                                        route.path,
-                                        route.permission
-                                    );
-                                }
-                                let role_perms = ROLE_PERMS.read().await;
-                                if let Some(perms) = role_perms.get(&claims.role_id) {
-                                    log::info!("perms: {:?}", perms);
-                                }
-                                let res = fut.await?;
-                                Ok(res)
-                            })
-                        }
-                        Err(_) => Box::pin(async move {
-                            Err(AppError::Unauthorized("无效的令牌".to_string()).into())
-                        }),
-                    }
-                }
-                Err(e) => Box::pin(async move { Err(Error::from(e)) }),
+            // 需要认证的路径，检查 JWT（先判断是否存在，释放借用后再 move req）
+            let has_claims = req
+                .extensions()
+                .get::<crate::utils::jwt::TokenClaims>()
+                .is_some();
+            if has_claims {
+                let fut = self.service.call(req);
+                Box::pin(async move {
+                    let res = fut.await?;
+                    Ok(res)
+                })
+            } else {
+                Box::pin(async move { Err(AppError::Unauthorized("请先登录".to_string()).into()) })
             }
         }
     }

@@ -1,3 +1,5 @@
+use actix_web::{HttpMessage, HttpRequest};
+
 use crate::EmptyResponse;
 use crate::config::AppError;
 use crate::dto::PaginatedResp;
@@ -12,7 +14,20 @@ use crate::dto::posts::{
 };
 use crate::dto::user::ValidationErrorJson;
 use crate::models::{categories, post_tags, posts, tags};
+use crate::utils::jwt::TokenClaims;
 use crate::{ApiResponse, HttpResult};
+
+/// 从请求中获取当前用户ID。如果未登录（游客访问），返回 None。
+fn current_user_id(req: &HttpRequest) -> Option<i32> {
+    if let Some(claims) = req.extensions().get::<TokenClaims>() {
+        // 通过 user_uuid 查询用户（简化处理：单人博客作者固定为 id=1）
+        // 实际项目中应通过 db 查询 uuid 对应的 id
+        log::info!("当前用户: {} ({})", claims.user_name, claims.user_uuid);
+        Some(1) // TODO: 从数据库通过 uuid 查询真实 user_id
+    } else {
+        None
+    }
+}
 use actix_web::web;
 use sea_orm::RelationTrait;
 use sea_orm::{
@@ -385,12 +400,12 @@ pub async fn get_prev_next_handler(
     ),
 )]
 pub async fn create_post_handler(
+    req: HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
-    post_data: web::Json<CreatePostRequest>, // 从认证中间件获取用户ID
-                                             // user_id: web::ReqData<i32>,
+    post_data: web::Json<CreatePostRequest>,
 ) -> HttpResult {
     log::info!("create_post_handler: {post_data:?}");
-    let user_id = 1;
+    let user_id = current_user_id(&req).unwrap_or(1);
     // 验证输入
     if let Err(validation_errors) = post_data.validate() {
         let msg = ValidationErrorJson::from_validation_errors(&validation_errors);
@@ -429,12 +444,12 @@ pub async fn create_post_handler(
     ),
 )]
 pub async fn update_post_handler(
+    req: HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
     path: web::Path<String>,
-    post_data: web::Json<UpdatePostRequest>, // 从认证中间件获取用户ID
-                                             // user_id: web::ReqData<i32>,
+    post_data: web::Json<UpdatePostRequest>,
 ) -> HttpResult {
-    let user_id = 1;
+    let user_id = current_user_id(&req).unwrap_or(1);
     // 验证输入
     if let Err(validation_errors) = post_data.validate() {
         let msg = ValidationErrorJson::from_validation_errors(&validation_errors);
@@ -474,11 +489,11 @@ pub async fn update_post_handler(
     ),
 )]
 pub async fn delete_post_handler(
+    req: HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
-    path: web::Path<String>, // 从认证中间件获取用户ID
-                             // user_id: web::ReqData<i32>,
+    path: web::Path<String>,
 ) -> HttpResult {
-    let user_id = 1;
+    let user_id = current_user_id(&req).unwrap_or(1);
     let uuid = path.into_inner();
 
     // 调用服务层删除文章

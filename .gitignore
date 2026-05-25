@@ -5,6 +5,7 @@ migration
 change-commit-date.sh
 /out
 /logs
+/temp
 openapi.json
 git_purge_file.sh
 .codebuddy/

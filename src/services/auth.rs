@@ -35,10 +35,10 @@ impl AuthService {
         } = user_data.into_inner();
         let password_hash = hash(&pass_word)?;
         // —— 1. 开事务 ——
-        let txn = db_pool
-            .begin()
-            .await
-            .map_err(|_| AppError::DatabaseError(String::from("Begin transaction failed")))?;
+        let txn = db_pool.begin().await.map_err(|e| {
+            log::error!("开启事务失败(已隐藏): {:?}", e);
+            AppError::DatabaseError(String::new())
+        })?;
 
         // —— 2. 插用户 ——
         let user_am = ActiveModel {
@@ -49,18 +49,18 @@ impl AuthService {
             updated_at: Set(Utc::now()),
             ..Default::default()
         };
-        let user = user_am
-            .insert(&txn)
-            .await
-            .map_err(|_| AppError::DatabaseError(String::from("Insert user failed")))?;
+        let user = user_am.insert(&txn).await.map_err(|e| {
+            log::error!("创建用户失败(已隐藏): {:?}", e);
+            AppError::DatabaseError(String::new())
+        })?;
 
-        // —— 3. 查 VIEWER 角色 id ——
+        // —— 3. 查 SUPER_ADMIN 角色 id（单人博客，注册即管理员） ——
         let viewer_role = roles::Entity::find()
             .filter(roles::Column::Code.eq("SUPER_ADMIN"))
             .one(&txn)
             .await
-            .map_err(|_| AppError::DatabaseError("VIEWER role not found".into()))?
-            .ok_or_else(|| AppError::DatabaseError("VIEWER role not found".into()))?;
+            .map_err(|_| AppError::DatabaseError("SUPER_ADMIN role not found".into()))?
+            .ok_or_else(|| AppError::DatabaseError("SUPER_ADMIN role not found".into()))?;
 
         // —— 4. 绑角色（is_primary = true） ——
         let user_role_am = user_roles::ActiveModel {
@@ -70,15 +70,16 @@ impl AuthService {
             created_at: Set(Utc::now()),
             ..Default::default()
         };
-        user_role_am
-            .insert(&txn)
-            .await
-            .map_err(|_| AppError::DatabaseError("Insert user role failed".into()))?;
+        user_role_am.insert(&txn).await.map_err(|e| {
+            log::error!("绑定角色失败(已隐藏): {:?}", e);
+            AppError::DatabaseError(String::new())
+        })?;
 
         // —— 5. 提交事务 ——
-        txn.commit()
-            .await
-            .map_err(|_| AppError::DatabaseError("Commit transaction failed".into()))?;
+        txn.commit().await.map_err(|e| {
+            log::error!("提交事务失败(已隐藏): {:?}", e);
+            AppError::DatabaseError(String::new())
+        })?;
         // —— 6. 原通知逻辑保持不动 ——
         let notification = serde_json::json!({
             "event": "user_updated",
@@ -133,8 +134,8 @@ impl AuthService {
                 Err(AppError::Unauthorized("密码错误".to_string()))
             }
             Err(e) => {
-                // 登录失败
-                Err(AppError::Unauthorized(e.to_string()))
+                log::error!("密码验证失败(已隐藏): {:?}", e);
+                Err(AppError::Unauthorized("密码错误".to_string()))
             }
         }
     }

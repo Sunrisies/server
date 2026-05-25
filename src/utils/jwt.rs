@@ -2,7 +2,6 @@ use crate::config::manager::CONFIG;
 use crate::models::roles::{self};
 use crate::models::user_roles;
 use crate::{config::AppError, models::users::Model};
-use base64::engine::{Engine as _, general_purpose};
 use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
@@ -62,11 +61,7 @@ pub async fn generate_jwt(
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(
-            &general_purpose::STANDARD
-                .decode(&CONFIG.jwt.secret)
-                .map_err(|_| AppError::InternalServerError("JWT 密钥格式错误".into()))?,
-        ),
+        &EncodingKey::from_secret(CONFIG.jwt.secret.as_bytes()),
     )
     .map_err(|e| {
         log::error!("JWT 生成失败: {}", e);
@@ -79,11 +74,7 @@ pub fn decode_jwt(token: &str) -> Result<TokenClaims, AppError> {
     let validation = Validation::new(Algorithm::HS256);
     decode::<TokenClaims>(
         token,
-        &DecodingKey::from_secret(
-            &general_purpose::STANDARD
-                .decode(&CONFIG.jwt.secret)
-                .map_err(|_| AppError::InternalServerError("JWT 密钥格式错误".into()))?,
-        ),
+        &DecodingKey::from_secret(CONFIG.jwt.secret.as_bytes()),
         &validation,
     )
     .map_err(|e| match e.kind() {

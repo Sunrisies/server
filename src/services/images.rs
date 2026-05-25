@@ -97,8 +97,8 @@ impl ImageService {
             Err(e) => {
                 // 清理临时文件
                 let _ = tokio::fs::remove_file(&file_info.temp_path).await;
-                error!("Upload failed: {e}");
-                Err(AppError::UploadFailed(format!("上传失败: {e}")))
+                error!("上传失败(已隐藏): {e}");
+                Err(AppError::UploadFailed("文件上传失败，请重试".to_string()))
             }
         }
     }
@@ -280,8 +280,10 @@ impl ImageService {
     /// 处理图片（调整大小等）
     fn process_image(temp_path: &Path, filename: &str) -> Result<(), AppError> {
         // 验证图片有效性
-        let image = image::open(temp_path)
-            .map_err(|e| AppError::BadRequest(format!("无效的图片文件: {e}")))?;
+        let image = image::open(temp_path).map_err(|e| {
+            log::error!("无效的图片文件(已隐藏): {:?}", e);
+            AppError::BadRequest("无效的图片文件，请上传正确的图片格式".to_string())
+        })?;
 
         // 调整图片大小
         let resized_image = image.resize(
