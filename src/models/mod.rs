@@ -3,6 +3,7 @@
 pub mod prelude;
 
 pub mod categories;
+pub mod clipboard_entries;
 pub mod external_links;
 pub mod images;
 pub mod permissions;
