@@ -85,16 +85,6 @@ impl LoginRequest {
 lazy_static! {
     static ref RE_PHONE: Regex = Regex::new(r"^1[3-9]\d{9}$").unwrap();
 }
-// #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize)]
-// pub struct LoginRequest {
-//     #[validate(length(min = 5, max = 100, message = "用户名长度必须在5到100之间"))]
-//     pub user_name: String,
-//     #[validate(length(min = 6, max = 100, message = "密码长度必须在6到100之间"))]
-//     pub pass_word: String,
-//    /// 登录类型，一般登录,邮箱登录,手机号登录,第三方登录
-//    #[validate()]
-//     pub login_type: String,
-// }
 
 #[derive(Validate, Debug, Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RegisterResponse {

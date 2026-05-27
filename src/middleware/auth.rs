@@ -66,6 +66,7 @@ where
             "/api/v1/tags",
             "/api/v1/posts",
             "/api/v1/categories",
+            "/api/v1/clipboard",
             "/api/v1/rooms",
             "/api/v1/upload",
             "/api/v1/email",

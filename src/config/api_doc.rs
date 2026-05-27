@@ -5,8 +5,8 @@ use crate::handlers::category::categories_routes::{
     __path_get_categories_handler,
 };
 use crate::handlers::clipboard::{
-    __path_create_file_handler, __path_create_text_handler, __path_delete_handler,
-    __path_list_handler,
+    __path_auth_channel_handler, __path_create_channel_handler, __path_create_file_handler,
+    __path_create_text_handler, __path_delete_handler, __path_list_handler,
 };
 use crate::handlers::email::__path_send_verification_code;
 use crate::handlers::images::{
@@ -79,6 +79,8 @@ use utoipa::OpenApi;
         create_external_links_handler,
         delete_external_links_handler,
         // 云剪贴板
+        create_channel_handler,
+        auth_channel_handler,
         create_text_handler,
         create_file_handler,
         list_handler,

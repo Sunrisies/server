@@ -1,3 +1,4 @@
+pub mod channel_jwt;
 pub mod sse;
 pub use sse::*;
 mod db_error;

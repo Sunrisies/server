@@ -2,6 +2,44 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
+// ── 频道 ──
+
+/// 创建频道请求
+#[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
+pub struct CreateChannelRequest {
+    /// 频道名称
+    #[validate(length(min = 1, max = 100))]
+    #[schema(example = "我的频道")]
+    pub name: String,
+    /// 频道密码（至少4位）
+    #[validate(length(min = 4, max = 100))]
+    #[schema(example = "1234")]
+    pub password: String,
+}
+
+/// 频道登录请求
+#[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
+pub struct AuthChannelRequest {
+    /// 频道名称
+    #[validate(length(min = 1, max = 100))]
+    #[schema(example = "我的频道")]
+    pub name: String,
+    /// 频道密码
+    #[validate(length(min = 1, max = 100))]
+    #[schema(example = "1234")]
+    pub password: String,
+}
+
+/// 频道认证响应
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AuthChannelResponse {
+    pub channel_id: i32,
+    pub channel_name: String,
+    pub token: String,
+}
+
+// ── 文本上传 ──
+
 /// 上传文本请求
 #[derive(Debug, Validate, Deserialize, Serialize, ToSchema)]
 pub struct CreateTextRequest {
@@ -9,6 +47,8 @@ pub struct CreateTextRequest {
     #[schema(example = "这是一段需要跨设备同步的文本内容")]
     pub content: String,
 }
+
+// ── 条目响应 ──
 
 /// 剪贴板条目响应
 #[derive(Debug, Serialize, ToSchema)]
@@ -46,6 +86,8 @@ impl From<crate::models::clipboard_entries::Model> for ClipboardEntryResponse {
     }
 }
 
+// ── 列表查询 ──
+
 /// 剪贴板列表筛选
 #[derive(Debug, Deserialize, Serialize, IntoParams)]
 #[into_params(style = Form, parameter_in = Query)]
@@ -62,13 +104,15 @@ pub struct ClipboardQuery {
     /// 搜索关键词（搜索文本内容，仅对 text 类型有效）
     #[param(example = "关键词")]
     pub q: Option<String>,
-    /// 开始日期（YYYY-MM-DD），筛选该日期之后创建的内容
+    /// 开始日期（YYYY-MM-DD）
     #[param(example = "2026-05-01")]
     pub start_date: Option<String>,
-    /// 结束日期（YYYY-MM-DD），筛选该日期之前创建的内容
+    /// 结束日期（YYYY-MM-DD）
     #[param(example = "2026-05-27")]
     pub end_date: Option<String>,
 }
+
+// ── 文件上传结果 ──
 
 /// 文件上传结果（七牛返回）
 #[derive(Debug)]

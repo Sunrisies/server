@@ -3,12 +3,72 @@ use actix_web::{HttpMessage, HttpRequest, web};
 use futures_util::StreamExt;
 use sea_orm::DatabaseConnection;
 
-use crate::dto::clipboard::{ClipboardEntryResponse, ClipboardQuery, CreateTextRequest};
-use crate::dto::common::PaginatedResp;
-use crate::utils::jwt::TokenClaims;
-use crate::{
-    ApiResponse, AppError, EmptyResponse, HttpResult, services::clipboard::ClipboardService,
+use crate::dto::clipboard::{
+    AuthChannelRequest, ClipboardEntryResponse, ClipboardQuery, CreateChannelRequest,
+    CreateTextRequest,
 };
+use crate::dto::common::PaginatedResp;
+use crate::services::clipboard::{ClipboardService, extract_channel_claims};
+use crate::utils::jwt::TokenClaims;
+use crate::{ApiResponse, AppError, EmptyResponse, HttpResult};
+
+// ── 频道 ──
+
+/// 创建频道
+#[utoipa::path(
+    post,
+    path = "/api/v1/clipboard/channel",
+    tag = "云剪贴板",
+    summary = "创建频道",
+    description = "创建一个新的剪贴板频道（需要管理员登录），返回频道 token",
+    request_body(content = CreateChannelRequest, examples(
+        ("创建频道" = (value = json!({"name": "我的频道", "password": "1234"})))
+    )),
+    responses(
+        (status = 200, description = "创建成功", body = ApiResponse<crate::dto::clipboard::AuthChannelResponse>),
+        (status = 400, description = "参数错误"),
+        (status = 401, description = "未登录"),
+        (status = 409, description = "频道名称已存在"),
+    ),
+)]
+pub async fn create_channel_handler(
+    req: HttpRequest,
+    db: web::Data<DatabaseConnection>,
+    body: web::Json<CreateChannelRequest>,
+) -> HttpResult {
+    // 需要管理员登录（检查 admin JWT）
+    if req.extensions().get::<TokenClaims>().is_none() {
+        return Err(AppError::Unauthorized("请先登录".to_string()));
+    }
+    let result = ClipboardService::create_channel(db.as_ref(), body.into_inner()).await?;
+    Ok(ApiResponse::success(result, "频道创建成功").to_http_response())
+}
+
+/// 登录频道
+#[utoipa::path(
+    post,
+    path = "/api/v1/clipboard/channel/auth",
+    tag = "云剪贴板",
+    summary = "登录频道",
+    description = "输入频道名称和密码，获取频道 token",
+    request_body(content = AuthChannelRequest, examples(
+        ("登录频道" = (value = json!({"name": "我的频道", "password": "1234"})))
+    )),
+    responses(
+        (status = 200, description = "登录成功", body = ApiResponse<crate::dto::clipboard::AuthChannelResponse>),
+        (status = 401, description = "密码错误"),
+        (status = 404, description = "频道不存在"),
+    ),
+)]
+pub async fn auth_channel_handler(
+    db: web::Data<DatabaseConnection>,
+    body: web::Json<AuthChannelRequest>,
+) -> HttpResult {
+    let result = ClipboardService::auth_channel(db.as_ref(), body.into_inner()).await?;
+    Ok(ApiResponse::success(result, "登录成功").to_http_response())
+}
+
+// ── 文本上传 ──
 
 /// 上传文本到剪贴板
 #[utoipa::path(
@@ -16,25 +76,14 @@ use crate::{
     path = "/api/v1/clipboard/text",
     tag = "云剪贴板",
     summary = "上传文本",
-    description = "将文本内容保存到云剪贴板，可在其他设备查看和复制",
+    description = "将文本内容保存到云剪贴板（需要频道 token）",
     request_body(content = CreateTextRequest, examples(
         ("文本示例" = (value = json!({"content": "这是一段需要跨设备同步的文本内容"})))
     )),
     responses(
-        (status = 200, description = "上传成功", body = ApiResponse<ClipboardEntryResponse>,
-            example = json!({
-                "code": 200,
-                "message": "上传成功",
-                "data": {
-                    "uuid": "550e8400-e29b-41d4-a716-446655440000",
-                    "type": "text",
-                    "content": "这是一段需要跨设备同步的文本内容",
-                    "pinned": false,
-                    "created_at": "2026-05-26T10:30:00Z"
-                }
-            })),
+        (status = 200, description = "上传成功", body = ApiResponse<ClipboardEntryResponse>),
         (status = 400, description = "内容为空或过长"),
-        (status = 401, description = "未登录"),
+        (status = 401, description = "需要频道 token"),
     ),
 )]
 pub async fn create_text_handler(
@@ -42,8 +91,9 @@ pub async fn create_text_handler(
     db: web::Data<DatabaseConnection>,
     body: web::Json<CreateTextRequest>,
 ) -> HttpResult {
-    let user_id = current_user_id(&req);
-    let result = ClipboardService::create_text(db.as_ref(), user_id, body.into_inner()).await?;
+    let claims = extract_channel_claims(&req)?;
+    let result =
+        ClipboardService::create_text(db.as_ref(), claims.channel_id, body.into_inner()).await?;
     Ok(ApiResponse::success(result, "上传成功").to_http_response())
 }
 
@@ -53,26 +103,12 @@ pub async fn create_text_handler(
     path = "/api/v1/clipboard/file",
     tag = "云剪贴板",
     summary = "上传文件或图片",
-    description = "上传文件到云剪贴板（支持任意类型，最大 50MB，图片自动识别）",
+    description = "上传文件到云剪贴板（需要频道 token，支持任意类型，最大 50MB）",
     request_body(content = String, description = "文件数据（multipart/form-data），字段名 file"),
     responses(
-        (status = 200, description = "上传成功", body = ApiResponse<ClipboardEntryResponse>,
-            example = json!({
-                "code": 200,
-                "message": "上传成功",
-                "data": {
-                    "uuid": "550e8400-e29b-41d4-a716-446655440000",
-                    "type": "image",
-                    "file_url": "https://img.sunrise1024.top/clipboard/xxx.jpg",
-                    "file_name": "Screenshot.jpg",
-                    "file_size": 234567,
-                    "mime_type": "image/jpeg",
-                    "pinned": false,
-                    "created_at": "2026-05-26T10:30:00Z"
-                }
-            })),
+        (status = 200, description = "上传成功", body = ApiResponse<ClipboardEntryResponse>),
         (status = 400, description = "文件过大或参数错误"),
-        (status = 401, description = "未登录"),
+        (status = 401, description = "需要频道 token"),
     ),
 )]
 pub async fn create_file_handler(
@@ -80,9 +116,8 @@ pub async fn create_file_handler(
     db: web::Data<DatabaseConnection>,
     mut payload: Multipart,
 ) -> HttpResult {
-    let user_id = current_user_id(&req);
+    let claims = extract_channel_claims(&req)?;
 
-    // 从 multipart 中提取第一个 file 字段
     while let Some(item) = payload.next().await {
         let mut field = item.map_err(|e| AppError::MultipartError(e.to_string()))?;
         let field_name = field
@@ -91,7 +126,8 @@ pub async fn create_file_handler(
             .unwrap_or_default();
 
         if field_name == "file" {
-            let result = ClipboardService::create_file(db.as_ref(), user_id, &mut field).await?;
+            let result =
+                ClipboardService::create_file(db.as_ref(), claims.channel_id, &mut field).await?;
             return Ok(ApiResponse::success(result, "上传成功").to_http_response());
         }
     }
@@ -107,11 +143,11 @@ pub async fn create_file_handler(
     path = "/api/v1/clipboard",
     tag = "云剪贴板",
     summary = "获取剪贴板列表",
-    description = "分页获取当前用户的剪贴板条目列表，按时间倒序",
+    description = "分页获取当前频道的剪贴板条目（需要频道 token）",
     params(ClipboardQuery),
     responses(
         (status = 200, description = "获取成功", body = ApiResponse<PaginatedResp<ClipboardEntryResponse>>),
-        (status = 401, description = "未登录"),
+        (status = 401, description = "需要频道 token"),
     ),
 )]
 pub async fn list_handler(
@@ -119,7 +155,7 @@ pub async fn list_handler(
     db: web::Data<DatabaseConnection>,
     query: web::Query<ClipboardQuery>,
 ) -> HttpResult {
-    let user_id = current_user_id(&req);
+    let claims = extract_channel_claims(&req)?;
     let page = query.page.unwrap_or(1);
     let limit = query.limit.unwrap_or(20);
     let type_filter = query.r#type.clone();
@@ -129,7 +165,7 @@ pub async fn list_handler(
 
     let result = ClipboardService::list(
         db.as_ref(),
-        user_id,
+        claims.channel_id,
         page,
         limit,
         type_filter,
@@ -147,13 +183,13 @@ pub async fn list_handler(
     path = "/api/v1/clipboard/{uuid}",
     tag = "云剪贴板",
     summary = "删除剪贴板条目",
-    description = "根据 UUID 删除指定的剪贴板条目（文件类同时删除七牛云文件）",
+    description = "根据 UUID 删除指定的剪贴板条目（需要频道 token）",
     params(
         ("uuid" = String, Path, description = "条目 UUID")
     ),
     responses(
         (status = 200, description = "删除成功", body = ApiResponse<EmptyResponse>),
-        (status = 401, description = "未登录"),
+        (status = 401, description = "需要频道 token"),
         (status = 403, description = "无权操作"),
         (status = 404, description = "条目不存在"),
     ),
@@ -163,21 +199,9 @@ pub async fn delete_handler(
     db: web::Data<DatabaseConnection>,
     path: web::Path<String>,
 ) -> HttpResult {
-    let user_id = current_user_id(&req);
+    let claims = extract_channel_claims(&req)?;
     let uuid = path.into_inner();
 
-    ClipboardService::delete(db.as_ref(), user_id, &uuid).await?;
+    ClipboardService::delete(db.as_ref(), claims.channel_id, &uuid).await?;
     Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse, "删除成功").to_http_response())
-}
-
-/// 从请求中获取当前用户 ID
-fn current_user_id(req: &HttpRequest) -> i32 {
-    if let Some(claims) = req.extensions().get::<TokenClaims>() {
-        log::info!("剪贴板操作: {} ({})", claims.user_name, claims.user_uuid);
-        // 单人博客简化处理：返回 1
-        1
-    } else {
-        // 应该有中间件保证登录，但以防万一
-        1
-    }
 }

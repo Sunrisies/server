@@ -2,7 +2,6 @@ use crate::config::manager::CONFIG;
 use crate::dto::common::PaginationQuery;
 use crate::dto::image::ImageUploadResponse;
 use crate::models::images;
-// use crate::dto::image::ImageUploadResponse;
 use crate::utils::file_size::FileSize;
 use crate::{ApiResponse, HttpResult, config::AppError};
 use actix_multipart::Multipart;

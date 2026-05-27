@@ -1,9 +1,15 @@
 use crate::config::AppError;
 use crate::config::manager::CONFIG;
-use crate::dto::clipboard::{ClipboardEntryResponse, CreateTextRequest, UploadResult};
+use crate::dto::clipboard::{
+    AuthChannelRequest, AuthChannelResponse, ClipboardEntryResponse, CreateChannelRequest,
+    CreateTextRequest, UploadResult,
+};
 use crate::dto::common::{PaginatedResp, Pagination};
+use crate::models::clipboard_channels;
 use crate::models::clipboard_entries;
 use crate::models::clipboard_entries::Entity as ClipboardEntity;
+use crate::utils::channel_jwt::{self, ChannelClaims};
+use crate::utils::crypto_pwd::{hash, verify};
 use actix_multipart::Field;
 use chrono::{Datelike, Local, Utc};
 use futures_util::StreamExt;
@@ -24,32 +30,107 @@ use std::time::Duration;
 use uuid::Uuid;
 
 const MAX_FILE_SIZE: i64 = 50 * 1024 * 1024; // 50MB
-const MAX_TEXT_LENGTH: usize = 100_000;
 
 pub struct ClipboardService;
 
 impl ClipboardService {
+    // ── 频道 ──
+
+    /// 创建频道
+    pub async fn create_channel(
+        db: &DatabaseConnection,
+        req: CreateChannelRequest,
+    ) -> Result<AuthChannelResponse, AppError> {
+        let name = req.name.trim().to_string();
+        if name.is_empty() {
+            return Err(AppError::BadRequest("频道名称不能为空".to_string()));
+        }
+
+        // 检查名称是否已存在
+        if clipboard_channels::Entity::find_by_name(&name)
+            .one(db)
+            .await
+            .map_err(|e| {
+                error!("查询频道失败: {:?}", e);
+                AppError::DatabaseError("查询失败".to_string())
+            })?
+            .is_some()
+        {
+            return Err(AppError::AlreadyExists("频道名称已存在".to_string()));
+        }
+
+        let pwd_hash = hash(&req.password).map_err(|e| {
+            error!("密码加密失败: {:?}", e);
+            AppError::InternalServerError("服务器错误".to_string())
+        })?;
+
+        let now = Utc::now();
+        let model = clipboard_channels::ActiveModel {
+            name: Set(name.clone()),
+            password_hash: Set(pwd_hash),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        let channel = model.insert(db).await.map_err(|e| {
+            error!("创建频道失败: {:?}", e);
+            AppError::DatabaseError("创建失败".to_string())
+        })?;
+
+        let token = channel_jwt::generate_channel_token(channel.id, &channel.name)?;
+
+        Ok(AuthChannelResponse {
+            channel_id: channel.id,
+            channel_name: channel.name,
+            token,
+        })
+    }
+
+    /// 登录频道
+    pub async fn auth_channel(
+        db: &DatabaseConnection,
+        req: AuthChannelRequest,
+    ) -> Result<AuthChannelResponse, AppError> {
+        let channel = clipboard_channels::Entity::find_by_name(&req.name)
+            .one(db)
+            .await
+            .map_err(|e| {
+                error!("查询频道失败: {:?}", e);
+                AppError::DatabaseError("查询失败".to_string())
+            })?
+            .ok_or_else(|| AppError::NotFound("频道不存在".to_string()))?;
+
+        if !verify(&req.password, &channel.password_hash).unwrap_or(false) {
+            return Err(AppError::Unauthorized("密码错误".to_string()));
+        }
+
+        let token = channel_jwt::generate_channel_token(channel.id, &channel.name)?;
+
+        Ok(AuthChannelResponse {
+            channel_id: channel.id,
+            channel_name: channel.name,
+            token,
+        })
+    }
+
+    // ── 文本上传 ──
+
     /// 上传文本
     pub async fn create_text(
         db: &DatabaseConnection,
-        user_id: i32,
+        channel_id: i32,
         req: CreateTextRequest,
     ) -> Result<ClipboardEntryResponse, AppError> {
         let content = req.content.trim().to_string();
         if content.is_empty() {
             return Err(AppError::BadRequest("内容不能为空".to_string()));
         }
-        if content.len() > MAX_TEXT_LENGTH {
-            return Err(AppError::BadRequest(format!(
-                "内容过长，最大允许 {} 字符",
-                MAX_TEXT_LENGTH
-            )));
-        }
 
         let now = Utc::now();
         let model = clipboard_entries::ActiveModel {
             uuid: Set(Uuid::new_v4().to_string()),
-            user_id: Set(user_id),
+            channel_id: Set(channel_id),
             r#type: Set("text".to_string()),
             content: Set(Some(content)),
             pinned: Set(false),
@@ -66,13 +147,14 @@ impl ClipboardService {
         Ok(entry.into())
     }
 
-    /// 上传文件（图片/任意文件）
+    // ── 文件上传 ──
+
+    /// 上传文件/图片
     pub async fn create_file(
         db: &DatabaseConnection,
-        user_id: i32,
+        channel_id: i32,
         field: &mut Field,
     ) -> Result<ClipboardEntryResponse, AppError> {
-        // 1. 获取文件名
         let content_disposition = field
             .content_disposition()
             .ok_or_else(|| AppError::BadRequest("缺少文件字段".to_string()))?;
@@ -81,10 +163,8 @@ impl ClipboardService {
             .ok_or_else(|| AppError::BadRequest("缺少文件名".to_string()))?
             .to_string();
 
-        // 2. 写入临时文件，同时检测大小
         let (temp_path, file_size, mime_type) = Self::save_temp_file(field, &file_name).await?;
 
-        // 3. 上传到七牛
         let upload_result = Self::upload_to_qiniu(&temp_path, &file_name, file_size, &mime_type)
             .map_err(|e| {
                 let _ = fs::remove_file(&temp_path);
@@ -92,21 +172,18 @@ impl ClipboardService {
                 AppError::UploadFailed("文件上传失败，请重试".to_string())
             })?;
 
-        // 清理临时文件
         let _ = fs::remove_file(&temp_path);
 
-        // 4. 检测类型
         let entry_type = if mime_type.starts_with("image/") {
             "image"
         } else {
             "file"
         };
 
-        // 5. 写入 DB
         let now = Utc::now();
         let model = clipboard_entries::ActiveModel {
             uuid: Set(Uuid::new_v4().to_string()),
-            user_id: Set(user_id),
+            channel_id: Set(channel_id),
             r#type: Set(entry_type.to_string()),
             content: Set(None),
             file_url: Set(Some(upload_result.url)),
@@ -127,11 +204,13 @@ impl ClipboardService {
         Ok(entry.into())
     }
 
+    // ── 列表 ──
+
     /// 获取列表
     #[allow(clippy::too_many_arguments)]
     pub async fn list(
         db: &DatabaseConnection,
-        user_id: i32,
+        channel_id: i32,
         page: u64,
         limit: u64,
         type_filter: Option<String>,
@@ -139,10 +218,10 @@ impl ClipboardService {
         start_date: Option<String>,
         end_date: Option<String>,
     ) -> Result<PaginatedResp<ClipboardEntryResponse>, AppError> {
-        let limit = limit.min(100); // 单页最多100条
+        let limit = limit.min(100);
 
         let mut query = ClipboardEntity::find()
-            .filter(clipboard_entries::Column::UserId.eq(user_id))
+            .filter(clipboard_entries::Column::ChannelId.eq(channel_id))
             .order_by_desc(clipboard_entries::Column::Pinned)
             .order_by_desc(clipboard_entries::Column::CreatedAt);
 
@@ -150,7 +229,6 @@ impl ClipboardService {
             query = query.filter(clipboard_entries::Column::Type.eq(t));
         }
 
-        // 内容搜索：对 text 类型匹配 content 字段
         if let Some(ref q) = search
             && !q.is_empty()
         {
@@ -159,7 +237,6 @@ impl ClipboardService {
                 .filter(clipboard_entries::Column::Content.contains(q));
         }
 
-        // 日期范围筛选
         if let Some(ref start) = start_date
             && let Ok(dt) = parse_date(start)
         {
@@ -168,7 +245,6 @@ impl ClipboardService {
         if let Some(ref end) = end_date
             && let Ok(dt) = parse_date(end)
         {
-            // 结束日期取当天 23:59:59
             let end_dt = dt
                 + chrono::Duration::hours(23)
                 + chrono::Duration::minutes(59)
@@ -198,8 +274,14 @@ impl ClipboardService {
         })
     }
 
-    /// 删除
-    pub async fn delete(db: &DatabaseConnection, user_id: i32, uuid: &str) -> Result<(), AppError> {
+    // ── 删除 ──
+
+    /// 删除条目
+    pub async fn delete(
+        db: &DatabaseConnection,
+        channel_id: i32,
+        uuid: &str,
+    ) -> Result<(), AppError> {
         let entry = ClipboardEntity::find_by_uuid(uuid)
             .one(db)
             .await
@@ -209,11 +291,10 @@ impl ClipboardService {
             })?
             .ok_or_else(|| AppError::NotFound("条目不存在".to_string()))?;
 
-        if entry.user_id != user_id {
+        if entry.channel_id != channel_id {
             return Err(AppError::Forbidden("无权操作该条目".to_string()));
         }
 
-        // 如果是文件类型，尝试删除七牛文件（失败不阻塞）
         if entry.r#type != "text"
             && let Some(ref file_url) = entry.file_url
             && let Some(key) = extract_key_from_url(file_url)
@@ -233,9 +314,8 @@ impl ClipboardService {
         Ok(())
     }
 
-    // --- 辅助方法 ---
+    // ── 辅助方法 ──
 
-    /// 保存 multipart 文件到临时目录，返回 (路径, 大小, MIME)
     async fn save_temp_file(
         field: &mut Field,
         file_name: &str,
@@ -261,7 +341,6 @@ impl ClipboardService {
             let data = chunk.map_err(|e| AppError::InternalServerError(e.to_string()))?;
 
             if first_chunk && !data.is_empty() {
-                // 通过魔数检测 MIME（简化：只检测常见图片格式）
                 detected_mime = detect_mime(&data, file_name);
                 first_chunk = false;
             }
@@ -283,7 +362,6 @@ impl ClipboardService {
         Ok((temp_path, total_size, detected_mime))
     }
 
-    /// 上传到七牛云
     fn upload_to_qiniu(
         file_path: &Path,
         original_filename: &str,
@@ -327,7 +405,6 @@ impl ClipboardService {
         })
     }
 
-    /// 生成七牛对象存储键
     fn generate_object_key(filename: &str) -> String {
         let now = Local::now();
         let ext = Path::new(filename)
@@ -352,20 +429,33 @@ impl ClipboardService {
         )
     }
 
-    /// 从七牛删除文件
     fn delete_from_qiniu(_key: &str) -> Result<(), anyhow::Error> {
-        // 七牛上传管理器 SDK 暂不支持直接删除
-        // 需要使用七牛管理 API（bucketManager）单独调用
-        // 此处预留，删除失败仅 warn 日志，不阻塞 DB 删除
-        log::warn!("七牛对象删除未实现，需手动清理或配置过期策略: {}", _key);
+        log::warn!("七牛对象删除未实现，需手动清理: {}", _key);
         Ok(())
     }
 }
 
-/// 从完整 URL 中提取七牛 key
+// ── 工具函数 ──
+
+/// 提取频道 token
+pub fn extract_channel_claims(req: &actix_web::HttpRequest) -> Result<ChannelClaims, AppError> {
+    // 优先从 Authorization header 取
+    if let Some(auth) = req
+        .headers()
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        && let Some(token) = auth.strip_prefix("Bearer ")
+    {
+        return channel_jwt::decode_channel_token(token);
+    }
+    // fallback: 从查询参数 ?token=xxx 取
+    if let Some(token) = req.query_string().strip_prefix("token=") {
+        return channel_jwt::decode_channel_token(token);
+    }
+    Err(AppError::Unauthorized("需要频道凭证".to_string()))
+}
+
 fn extract_key_from_url(url: &str) -> Option<String> {
-    // URL 格式: https://domain.com/clipboard/uuid/...
-    // 提取 domain 后面的部分
     if let Some(pos) = url.find(".top/") {
         Some(url[pos + 5..].to_string())
     } else if let Some(pos) = url.find(".com/") {
@@ -373,12 +463,10 @@ fn extract_key_from_url(url: &str) -> Option<String> {
     } else if let Some(pos) = url.find(".cn/") {
         Some(url[pos + 4..].to_string())
     } else {
-        // fallback: 尝试取 path
         url.split_once('/').map(|(_, rest)| rest.to_string())
     }
 }
 
-/// 构建完整 CDN URL
 fn build_final_url(key: &str) -> String {
     if CONFIG.qi_niu.domain_url.ends_with('/') {
         format!("{}{}", CONFIG.qi_niu.domain_url, key)
@@ -387,7 +475,6 @@ fn build_final_url(key: &str) -> String {
     }
 }
 
-/// 通过魔数检测 MIME 类型
 fn detect_mime(data: &[u8], filename: &str) -> String {
     if data.len() >= 4 && data[0..4] == [0x89, 0x50, 0x4E, 0x47] {
         return "image/png".to_string();
@@ -396,15 +483,13 @@ fn detect_mime(data: &[u8], filename: &str) -> String {
         return "image/jpeg".to_string();
     }
     if data.len() >= 4 && data[0..4] == [0x52, 0x49, 0x46, 0x46] {
-        return "image/webp".to_string(); // simplified
+        return "image/webp".to_string();
     }
-    // fallback: 根据扩展名判断
     let ext = Path::new(filename)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-
     match ext.as_str() {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -422,7 +507,6 @@ fn detect_mime(data: &[u8], filename: &str) -> String {
     .to_string()
 }
 
-/// 解析 YYYY-MM-DD 格式的日期字符串为 UTC 时间（当天 00:00:00）
 fn parse_date(s: &str) -> Result<chrono::DateTime<chrono::Utc>, chrono::ParseError> {
     let naive = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")?
         .and_hms_opt(0, 0, 0)

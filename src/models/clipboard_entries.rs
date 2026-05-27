@@ -12,7 +12,7 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(unique)]
     pub uuid: String,
-    pub user_id: i32,
+    pub channel_id: i32,
     pub r#type: String,
     #[sea_orm(column_type = "Text", nullable)]
     pub content: Option<String>,
@@ -32,18 +32,18 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::users::Entity",
-        from = "Column::UserId",
-        to = "super::users::Column::Id",
+        belongs_to = "super::clipboard_channels::Entity",
+        from = "Column::ChannelId",
+        to = "super::clipboard_channels::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    Users,
+    Channels,
 }
 
-impl Related<super::users::Entity> for Entity {
+impl Related<super::clipboard_channels::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Users.def()
+        Relation::Channels.def()
     }
 }
 
@@ -52,8 +52,8 @@ impl Entity {
         Self::find().filter(Column::Uuid.eq(uuid))
     }
 
-    pub fn find_by_user(_db: &DatabaseConnection, user_id: i32) -> Select<Entity> {
-        Self::find().filter(Column::UserId.eq(user_id))
+    pub fn find_by_channel(_db: &DatabaseConnection, channel_id: i32) -> Select<Entity> {
+        Self::find().filter(Column::ChannelId.eq(channel_id))
     }
 }
 

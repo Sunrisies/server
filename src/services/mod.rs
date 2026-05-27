@@ -7,8 +7,6 @@ pub mod ws;
 pub use ws::echo;
 pub mod sse;
 pub use sse::sse_stream;
-pub mod category;
-// pub use category::*;
 #[cfg(test)]
 mod auth_test;
 pub mod email;

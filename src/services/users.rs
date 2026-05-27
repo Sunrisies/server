@@ -1,7 +1,6 @@
 use actix_web::HttpResponse;
 use sea_orm::{DatabaseConnection, EntityTrait, QuerySelect};
 
-// pub struct CategyService;
 pub struct UserService;
 use crate::{config::AppError, models::users::Entity as UserEntity};
 impl UserService {
