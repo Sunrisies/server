@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use validator::Validate;
 
 /// 上传文本请求
@@ -47,11 +47,27 @@ impl From<crate::models::clipboard_entries::Model> for ClipboardEntryResponse {
 }
 
 /// 剪贴板列表筛选
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
 pub struct ClipboardQuery {
+    /// 页码，默认 1
+    #[param(example = 1)]
     pub page: Option<u64>,
+    /// 每页数量，默认 20
+    #[param(example = 20)]
     pub limit: Option<u64>,
+    /// 筛选类型：text / image / file
+    #[param(example = "text")]
     pub r#type: Option<String>,
+    /// 搜索关键词（搜索文本内容，仅对 text 类型有效）
+    #[param(example = "关键词")]
+    pub q: Option<String>,
+    /// 开始日期（YYYY-MM-DD），筛选该日期之后创建的内容
+    #[param(example = "2026-05-01")]
+    pub start_date: Option<String>,
+    /// 结束日期（YYYY-MM-DD），筛选该日期之前创建的内容
+    #[param(example = "2026-05-27")]
+    pub end_date: Option<String>,
 }
 
 /// 文件上传结果（七牛返回）

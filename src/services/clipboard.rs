@@ -128,13 +128,19 @@ impl ClipboardService {
     }
 
     /// 获取列表
+    #[allow(clippy::too_many_arguments)]
     pub async fn list(
         db: &DatabaseConnection,
         user_id: i32,
         page: u64,
         limit: u64,
         type_filter: Option<String>,
+        search: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
     ) -> Result<PaginatedResp<ClipboardEntryResponse>, AppError> {
+        let limit = limit.min(100); // 单页最多100条
+
         let mut query = ClipboardEntity::find()
             .filter(clipboard_entries::Column::UserId.eq(user_id))
             .order_by_desc(clipboard_entries::Column::Pinned)
@@ -142,6 +148,32 @@ impl ClipboardService {
 
         if let Some(ref t) = type_filter {
             query = query.filter(clipboard_entries::Column::Type.eq(t));
+        }
+
+        // 内容搜索：对 text 类型匹配 content 字段
+        if let Some(ref q) = search
+            && !q.is_empty()
+        {
+            query = query
+                .filter(clipboard_entries::Column::Type.eq("text"))
+                .filter(clipboard_entries::Column::Content.contains(q));
+        }
+
+        // 日期范围筛选
+        if let Some(ref start) = start_date
+            && let Ok(dt) = parse_date(start)
+        {
+            query = query.filter(clipboard_entries::Column::CreatedAt.gte(dt));
+        }
+        if let Some(ref end) = end_date
+            && let Ok(dt) = parse_date(end)
+        {
+            // 结束日期取当天 23:59:59
+            let end_dt = dt
+                + chrono::Duration::hours(23)
+                + chrono::Duration::minutes(59)
+                + chrono::Duration::seconds(59);
+            query = query.filter(clipboard_entries::Column::CreatedAt.lte(end_dt));
         }
 
         let paginator = query.paginate(db, limit);
@@ -388,4 +420,15 @@ fn detect_mime(data: &[u8], filename: &str) -> String {
         _ => "application/octet-stream",
     }
     .to_string()
+}
+
+/// 解析 YYYY-MM-DD 格式的日期字符串为 UTC 时间（当天 00:00:00）
+fn parse_date(s: &str) -> Result<chrono::DateTime<chrono::Utc>, chrono::ParseError> {
+    let naive = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")?
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    Ok(chrono::DateTime::from_naive_utc_and_offset(
+        naive,
+        chrono::Utc,
+    ))
 }

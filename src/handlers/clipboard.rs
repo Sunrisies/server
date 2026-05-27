@@ -108,11 +108,7 @@ pub async fn create_file_handler(
     tag = "云剪贴板",
     summary = "获取剪贴板列表",
     description = "分页获取当前用户的剪贴板条目列表，按时间倒序",
-    params(
-        ("page" = Option<u64>, Query, description = "页码，默认1"),
-        ("limit" = Option<u64>, Query, description = "每页数量，默认20"),
-        ("type" = Option<String>, Query, description = "筛选类型：text / image / file")
-    ),
+    params(ClipboardQuery),
     responses(
         (status = 200, description = "获取成功", body = ApiResponse<PaginatedResp<ClipboardEntryResponse>>),
         (status = 401, description = "未登录"),
@@ -125,10 +121,23 @@ pub async fn list_handler(
 ) -> HttpResult {
     let user_id = current_user_id(&req);
     let page = query.page.unwrap_or(1);
-    let limit = query.limit.unwrap_or(20).min(100);
+    let limit = query.limit.unwrap_or(20);
     let type_filter = query.r#type.clone();
+    let search = query.q.clone();
+    let start_date = query.start_date.clone();
+    let end_date = query.end_date.clone();
 
-    let result = ClipboardService::list(db.as_ref(), user_id, page, limit, type_filter).await?;
+    let result = ClipboardService::list(
+        db.as_ref(),
+        user_id,
+        page,
+        limit,
+        type_filter,
+        search,
+        start_date,
+        end_date,
+    )
+    .await?;
     Ok(ApiResponse::success(result, "获取成功").to_http_response())
 }
 

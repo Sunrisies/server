@@ -12,6 +12,6 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
             .route("/count", web::get().to(get_tags_with_count_handler)) // 新增这行
             .route("/{id}/posts", web::get().to(get_posts_by_tag_handler))
             // .route("/{id}", web::put().to(handlers::category::update_category))
-            .route("/{uuid:.*}", web::delete().to(delete_tags_handler)),
+            .route("/{id}", web::delete().to(delete_tags_handler)),
     );
 }
