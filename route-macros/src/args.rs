@@ -48,6 +48,7 @@ pub struct CrudEntityConfig {
     pub create_request_type: Option<Ident>,
     pub update_request_type: Option<Ident>,
     pub unique_field: Option<Ident>,
+    pub error_type: Option<syn::TypePath>,
     pub custom_queries: Option<Vec<CustomQueryType>>, // 新增：自定义查询类型
     pub custom_list_fn: Option<Ident>,                // 新增：自定义列表查询函数名
     pub custom_read_fn: Option<Ident>,                // 新增：自定义详情查询函数名
@@ -72,6 +73,7 @@ impl Parse for CrudEntityConfig {
         let mut create_request_type = None;
         let mut update_request_type = None;
         let mut unique_field = None;
+        let mut error_type = None;
         let mut custom_queries = None;
         let mut custom_list_fn = None;
         let mut custom_read_fn = None;
@@ -110,20 +112,20 @@ impl Parse for CrudEntityConfig {
                     let mut ops = Vec::new();
 
                     for elem in array.elems {
-                        if let Expr::Lit(lit) = elem {
-                            if let syn::Lit::Str(lit_str) = lit.lit {
-                                match lit_str.value().as_str() {
-                                    "create" => ops.push(CrudOperation::Create),
-                                    "read" => ops.push(CrudOperation::Read),
-                                    "update" => ops.push(CrudOperation::Update),
-                                    "delete" => ops.push(CrudOperation::Delete),
-                                    "list" => ops.push(CrudOperation::List),
-                                    _ => {
-                                        return Err(syn::Error::new_spanned(
-                                            lit_str,
-                                            "Unknown operation",
-                                        ));
-                                    }
+                        if let Expr::Lit(lit) = elem
+                            && let syn::Lit::Str(lit_str) = lit.lit
+                        {
+                            match lit_str.value().as_str() {
+                                "create" => ops.push(CrudOperation::Create),
+                                "read" => ops.push(CrudOperation::Read),
+                                "update" => ops.push(CrudOperation::Update),
+                                "delete" => ops.push(CrudOperation::Delete),
+                                "list" => ops.push(CrudOperation::List),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit_str,
+                                        "Unknown operation",
+                                    ));
                                 }
                             }
                         }
@@ -142,22 +144,26 @@ impl Parse for CrudEntityConfig {
                     let value: Ident = content.parse()?;
                     unique_field = Some(value);
                 }
+                "error_type" => {
+                    let value: syn::TypePath = content.parse()?;
+                    error_type = Some(value);
+                }
                 "custom_queries" => {
                     let array: ExprArray = content.parse()?;
                     let mut custom_query_types = Vec::new();
                     for elem in array.elems {
-                        if let Expr::Lit(lit) = elem {
-                            if let syn::Lit::Str(lit_str) = lit.lit {
-                                match lit_str.value().as_str() {
-                                    "list" => custom_query_types.push(CustomQueryType::List),
-                                    "read" => custom_query_types.push(CustomQueryType::Read),
-                                    "all" => custom_query_types.push(CustomQueryType::All),
-                                    _ => {
-                                        return Err(syn::Error::new_spanned(
-                                            lit_str,
-                                            "Unknown custom query type",
-                                        ));
-                                    }
+                        if let Expr::Lit(lit) = elem
+                            && let syn::Lit::Str(lit_str) = lit.lit
+                        {
+                            match lit_str.value().as_str() {
+                                "list" => custom_query_types.push(CustomQueryType::List),
+                                "read" => custom_query_types.push(CustomQueryType::Read),
+                                "all" => custom_query_types.push(CustomQueryType::All),
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit_str,
+                                        "Unknown custom query type",
+                                    ));
                                 }
                             }
                         }
@@ -217,6 +223,7 @@ impl Parse for CrudEntityConfig {
             create_request_type,
             update_request_type,
             unique_field,
+            error_type,
             custom_queries,
             custom_list_fn,
             custom_read_fn,

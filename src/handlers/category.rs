@@ -1,4 +1,3 @@
-use crate::config::AppError;
 use crate::dto::category::CreateCategoryRequest;
 use crate::dto::user::ValidationErrorJson;
 use crate::dto::{PaginatedResp, Pagination, PaginationQuery};
@@ -8,6 +7,7 @@ use crate::{ApiResponse, EmptyResponse, HttpResult, RouteInfo};
 use actix_web::{HttpResponse, web};
 use route_macros::crud_entity;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait};
+use validator::Validate;
 
 crud_entity!({
     entity : categories,

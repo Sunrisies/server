@@ -3462,8 +3462,22 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "route-macros-types",
  "syn 2.0.117",
  "utoipa",
+]
+
+[[package]]
+name = "route-macros-types"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "log",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "utoipa",
+ "validator",
 ]
 
 [[package]]
@@ -5016,6 +5030,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "route-macros",
+ "route-macros-types",
  "sea-orm",
  "serde",
  "serde_json",

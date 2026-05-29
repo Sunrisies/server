@@ -1,3 +1,10 @@
+[workspace]
+members = [
+    "route-macros",
+    "route-macros-types",
+]
+resolver = "2"
+
 [package]
 name = "web-server"
 version = "0.1.20"
@@ -42,6 +49,7 @@ utoipa = { version = "5.4.0", features = ["chrono"] }
 uuid = { version = "1.18.0", features = ["v4"] }
 validator = { version = "0.20.0", features = ["derive"] }
 route-macros = { path = "./route-macros" }
+route-macros-types = { path = "./route-macros-types" }
 inventory = "0.3.21"
 actix-rt = "2.11.0"
 actix-multipart = "0.7.2"

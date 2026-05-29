@@ -123,7 +123,7 @@ impl From<AppError> for ApiResponse<ValidationErrorJson> {
 pub type ApiResult<T> = Result<ApiResponse<T>, AppError>;
 
 /// HTTP结果的类型别名
-pub type HttpResult = Result<HttpResponse, AppError>;
+pub type HttpResult<E = AppError> = Result<HttpResponse, E>;
 
 /// 将ApiResult转换为HttpResult的实用函数
 pub fn to_http_result<T: Serialize>(result: ApiResult<T>) -> HttpResult {

@@ -5,10 +5,8 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Ident, LitStr, parse_macro_input};
 
-/// 简化版 CRUD 宏 - 为实体快速生成标准 CRUD 操作
 pub fn crud_entity(input: TokenStream) -> TokenStream {
     let config = parse_macro_input!(input as CrudEntityConfig);
-
     let entity = &config.entity;
     let route_prefix = &config.route_prefix;
     let permission_prefix = &config.permission_prefix;
@@ -24,12 +22,14 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             CrudOperation::List,
         ]
     });
-    let openapi_summary = config.openapi_summary.unwrap_or_else(|| {
-        LitStr::new(
-            &format!("{} CRUD operations", entity.to_string().to_uppercase()),
-            entity.span(),
-        )
-    });
+    let openapi_summary = config
+        .openapi_summary
+        .unwrap_or_else(|| LitStr::new(&format!("{} CRUD operations", entity), entity.span()));
+    let error_type = config
+        .error_type
+        .as_ref()
+        .map(|t| quote! { #t })
+        .unwrap_or_else(|| quote! { crate::AppError });
 
     let (fn_arg, call_expr, path_param_type, id_type_str) = match id_type {
         IdType::Uuid => (
@@ -47,19 +47,13 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     };
 
     let mod_name = format_ident!("{}_routes", entity.to_string().to_lowercase());
-
     let mut create_code = quote! {};
     let mut read_code = quote! {};
-    let mut update_code = quote! {};
+    let update_code = quote! {};
     let mut delete_code = quote! {};
     let mut list_code = quote! {};
-
-    // 记录操作信息
-    let module_name = entity.to_string();
     let mut operation_logs = Vec::new();
-
-    // 检查是否需要自定义查询
-    let use_custom_list = custom_queries.contains(&CustomQueryType::All)
+    let _use_custom_list = custom_queries.contains(&CustomQueryType::All)
         || custom_queries.contains(&CustomQueryType::List);
     let use_custom_read = custom_queries.contains(&CustomQueryType::All)
         || custom_queries.contains(&CustomQueryType::Read);
@@ -67,7 +61,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
     for operation in &operations {
         match operation {
             CrudOperation::Create => {
-                let create_openapi_gen = OpenApiGenerator::new(
+                let og = OpenApiGenerator::new(
                     entity,
                     route_prefix,
                     &openapi_summary,
@@ -79,16 +73,13 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     permission_prefix,
                     &config.create_request_type,
                     &config.unique_field,
-                    &create_openapi_gen,
+                    &error_type,
+                    &og,
                 );
-                operation_logs.push(format!(
-                    "创建操作: create_{}_handler",
-                    entity.to_string().to_lowercase()
-                ));
+                operation_logs.push(format!("创建操作: create_{}_handler", entity));
             }
             CrudOperation::Read => {
-                // 创建 OpenAPI 生成器
-                let openapi_gen = OpenApiGenerator::new(
+                let og = OpenApiGenerator::new(
                     entity,
                     route_prefix,
                     &openapi_summary,
@@ -101,32 +92,19 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     &path_param_type,
                     &fn_arg,
                     &call_expr,
-                    &openapi_gen,
+                    &og,
                     id_type_str,
                     use_custom_read,
                     &custom_read_fn,
+                    &error_type,
                 );
-                operation_logs.push(format!(
-                    "读取操作: get_{}_handler",
-                    entity.to_string().to_lowercase()
-                ));
+                operation_logs.push(format!("读取操作: get_{}_handler", entity));
             }
             CrudOperation::Update => {
-                let _update_openapi_gen = OpenApiGenerator::new(
-                    entity,
-                    route_prefix,
-                    &openapi_summary,
-                    config.openapi_update.as_ref(),
-                );
-                // 目前 update 未实现生成函数，预留
-                update_code = quote! {};
-                operation_logs.push(format!(
-                    "更新操作: update_{}_handler（待实现，需手写）",
-                    entity.to_string().to_lowercase()
-                ));
+                operation_logs.push(format!("更新操作: update_{}_handler（待实现）", entity));
             }
             CrudOperation::Delete => {
-                let openapi_gen = OpenApiGenerator::new(
+                let og = OpenApiGenerator::new(
                     entity,
                     route_prefix,
                     &openapi_summary,
@@ -139,66 +117,48 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     &path_param_type,
                     &fn_arg,
                     &call_expr,
-                    &openapi_gen,
+                    &og,
                     id_type_str,
+                    &error_type,
                 );
-                operation_logs.push(format!(
-                    "删除操作: delete_{}_handler",
-                    entity.to_string().to_lowercase()
-                ));
+                operation_logs.push(format!("删除操作: delete_{}_handler", entity));
             }
             CrudOperation::List => {
-                let openapi_gen = OpenApiGenerator::new(
+                let og = OpenApiGenerator::new(
                     entity,
                     route_prefix,
                     &openapi_summary,
                     config.openapi_list.as_ref(),
                 );
-                list_code = generate_list_code(
-                    entity,
-                    route_prefix,
-                    permission_prefix,
-                    &openapi_gen,
-                    // use_custom_list,
-                    // &custom_list_fn,
-                );
-                operation_logs.push(format!(
-                    "列表操作: get_{}_all_handler",
-                    entity.to_string().to_lowercase()
-                ));
+                list_code =
+                    generate_list_code(entity, route_prefix, permission_prefix, &og, &error_type);
+                operation_logs.push(format!("列表操作: get_{}_all_handler", entity));
             }
         }
     }
 
-    // 编译时输出日志
-    eprintln!("[route-macros] {}: {} 路由/{} 权限, {} 操作",
-        module_name, route_prefix.value(), permission_prefix.value(), operations.len());
-    for op_log in &operation_logs {
-        eprintln!("[route-macros]   └─ {}", op_log);
+    eprintln!(
+        "[route-macros] {}: {} 路由, {} 操作",
+        entity,
+        route_prefix.value(),
+        operations.len()
+    );
+    for op in &operation_logs {
+        eprintln!("[route-macros]   └─ {}", op);
     }
-    if use_custom_list || use_custom_read {
-        if let Some(ref fn_name) = custom_list_fn {
-            eprintln!("[route-macros]   └─ 自定义列表: {}", fn_name);
-        }
-        if let Some(ref fn_name) = custom_read_fn {
-            eprintln!("[route-macros]   └─ 自定义详情: {}", fn_name);
-        }
+    if let Some(ref f) = custom_list_fn {
+        eprintln!("[route-macros]   └─ 自定义列表: {}", f);
+    }
+    if let Some(ref f) = custom_read_fn {
+        eprintln!("[route-macros]   └─ 自定义详情: {}", f);
     }
 
-    let output = quote! {
-        pub mod #mod_name {
-            use super::*;
-            #create_code
-            #read_code
-            #update_code
-            #delete_code
-            #list_code
-        }
-    };
-
-    output.into()
+    quote! {
+        pub mod #mod_name { use super::*; #create_code #read_code #update_code #delete_code #list_code }
+    }.into()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_read_code(
     entity: &Ident,
     route_prefix: &LitStr,
@@ -210,105 +170,74 @@ fn generate_read_code(
     id_type_str: &str,
     use_custom: bool,
     custom_fn: &Option<Ident>,
+    error_type: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-    let get_fn = format_ident!("get_{}", entity.to_string().to_lowercase());
-    let get_handler = format_ident!("get_{}_handler", entity.to_string().to_lowercase());
+    let get_fn = format_ident!("get_{}", entity);
+    let handler = format_ident!("get_{}_handler", entity);
     let full_path = format!("{}/{{id}}", route_prefix.value());
-    let full_permission = format!("get::{}:read", permission_prefix.value());
-    let openapi_doc = openapi_gen.generate_read_doc(id_type_str);
-    if use_custom {
-        let custom_fn_name = custom_fn.as_ref().unwrap_or(&get_fn);
+    let perm = format!("get::{}:read", permission_prefix.value());
+    let doc = openapi_gen.generate_read_doc(id_type_str);
 
+    if use_custom {
+        let f = custom_fn.as_ref().unwrap_or(&get_fn);
         quote! {
-            #[crate::route_permission(
-                path = #full_path,
-                method = "get",
-                permission = #full_permission
-            )]
-            pub async fn #get_handler(
-                db: web::Data<DatabaseConnection>,
-                path: web::Path<#path_param_type>,
-            ) -> HttpResult {
-                let id = path.into_inner();
-                match #custom_fn_name(db.get_ref(), id).await {
-                    Ok(result) => Ok(result),
-                    Err(e) => {
-                        log::error!("自定义查询失败: {}", e);
-                        Err(AppError::DatabaseConnectionError(
-                            "查询失败".to_string(),
-                        ))
-                    }
+            #[crate::route_permission(path = #full_path, method = "get", permission = #perm)]
+            pub async fn #handler(db: web::Data<DatabaseConnection>, path: web::Path<#path_param_type>,
+            ) -> HttpResult<#error_type> {
+                match #f(db.get_ref(), path.into_inner()).await {
+                    Ok(r) => Ok(r),
+                    Err(e) => { log::error!("自定义查询失败: {}", e);
+                        Err(#error_type::DatabaseConnectionError("查询失败".into())) }
                 }
             }
         }
     } else {
         quote! {
-
-            /// 获取实体
-            pub async fn #get_fn(
-                db: &DatabaseConnection,
-                 #fn_arg,
-            ) -> Result<#entity::Model, AppError> {
-                #call_expr
-                    .one(db)
-                    .await
-                    .map_err(|e| AppError::DatabaseError(e.to_string()))?
-                    .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))
+            pub async fn #get_fn(db: &DatabaseConnection, #fn_arg) -> Result<#entity::Model, #error_type> {
+                #call_expr.one(db).await
+                    .map_err(|e| #error_type::DatabaseError(e.to_string()))?
+                    .ok_or_else(|| #error_type::NotFound(format!("{} not found", id)))
             }
-
-            #openapi_doc
-            #[crate::route_permission(
-                path = #full_path,
-                method = "get",
-                permission = #full_permission
-            )]
-            pub async fn #get_handler(
-                db: web::Data<DatabaseConnection>,
-                path: web::Path<#path_param_type>,
-            ) -> HttpResult {
-                let id = path.into_inner();
-                match #get_fn(db.get_ref(), id).await {
-                    Ok(data) => Ok(ApiResponse::success(data,"获取成功").to_http_response()),
+            #doc
+            #[crate::route_permission(path = #full_path, method = "get", permission = #perm)]
+            pub async fn #handler(db: web::Data<DatabaseConnection>, path: web::Path<#path_param_type>,
+            ) -> HttpResult<#error_type> {
+                match #get_fn(db.get_ref(), path.into_inner()).await {
+                    Ok(data) => Ok(ApiResponse::success(data, "获取成功").to_http_response()),
                     Err(e) => Err(e),
                 }
             }
         }
     }
 }
+
+#[allow(clippy::too_many_arguments)]
 fn generate_create_code(
     entity: &Ident,
     route_prefix: &LitStr,
     permission_prefix: &LitStr,
     create_request_type: &Option<Ident>,
     unique_field: &Option<Ident>,
+    error_type: &proc_macro2::TokenStream,
     openapi_gen: &OpenApiGenerator,
 ) -> proc_macro2::TokenStream {
-    let create_fn = format_ident!("create_{}", entity.to_string().to_lowercase());
-    let create_handler = format_ident!("create_{}_handler", entity.to_string().to_lowercase());
-    let full_path = format!("{}", route_prefix.value());
-    let full_permission = format!("{}:create", permission_prefix.value());
-
-    let create_request_type = match create_request_type {
-        Some(ident) => ident,
+    let create_fn = format_ident!("create_{}", entity);
+    let handler = format_ident!("create_{}_handler", entity);
+    let full_path = route_prefix.value().to_string();
+    let perm = format!("{}:create", permission_prefix.value());
+    let req_ty = match create_request_type {
+        Some(t) => t,
         None => {
-            return syn::Error::new_spanned(
-                entity,
-                "create_request_type is required for Create operation",
-            )
-            .to_compile_error()
-            .into();
+            return syn::Error::new_spanned(entity, "create_request_type required")
+                .to_compile_error();
         }
     };
-    let openapi_doc = openapi_gen.generate_create_doc(create_request_type);
-
-    // 唯一性检查代码（根据是否有 unique_field 配置决定）
-    let unique_check_code = if let Some(field) = unique_field {
-        let field_lower = Ident::new(&field.to_string().to_lowercase(), field.span());
+    let doc = openapi_gen.generate_create_doc(req_ty);
+    let unique_check = if let Some(field) = unique_field {
+        let f = Ident::new(&field.to_string().to_lowercase(), field.span());
         quote! {
-            if let Some(_existing) = #entity::Entity::check_unique(
-                db, <#entity::Column>::#field, data.#field_lower.to_string(),
-            ).await? {
-                return Err(AppError::DatabaseConnectionError("已存在".to_string()));
+            if let Some(_) = #entity::Entity::check_unique(db, <#entity::Column>::#field, data.#f.to_string()).await? {
+                return Err(#error_type::DatabaseConnectionError("已存在".into()));
             }
         }
     } else {
@@ -316,48 +245,29 @@ fn generate_create_code(
     };
 
     quote! {
-        use validator::Validate;
-        pub async fn #create_fn(
-            db: &DatabaseConnection,
-            data: #create_request_type,
-        ) ->Result<#entity::Model, AppError> {
-            if let Err(errors) = data.validate() {
-                eprintln!("Validation errors: {:?}", errors);
-                let msg = ValidationErrorJson::from_validation_errors(&errors);
-                return Err(AppError::ValidationError(msg));
+        pub async fn #create_fn(db: &DatabaseConnection, data: #req_ty) -> Result<#entity::Model, #error_type> {
+            if let Err(e) = data.validate() {
+                eprintln!("Validation errors: {:?}", e);
+                return Err(#error_type::ValidationError(ValidationErrorJson::from_validation_errors(&e)));
             }
-            // 唯一性检查（通过 unique_field 配置，如 unique_field: Name）
-            #unique_check_code
-
-            let active_model = #entity::ActiveModel::from(data);
-
-            let model = active_model.insert(db).await.map_err(|e| {
-                eprintln!("添加失败: {}", e);
-                AppError::DatabaseConnectionError(db_err_map(e).to_owned())
-            })?;
-
-            Ok(model)
+            #unique_check
+            #entity::ActiveModel::from(data).insert(db).await
+                .map_err(|e| { eprintln!("创建失败: {}", e); #error_type::DatabaseConnectionError(db_err_map(e).into()) })
         }
-
-        #openapi_doc
-        #[crate::route_permission(
-            path = #full_path,
-            method = "post",
-            permission = #full_permission
-        )]
-        pub async fn #create_handler(
-            db: web::Data<DatabaseConnection>,
-            data: web::Json<#create_request_type>,
-        ) -> HttpResult {
+        #doc
+        #[crate::route_permission(path = #full_path, method = "post", permission = #perm)]
+        pub async fn #handler(db: web::Data<DatabaseConnection>, data: web::Json<#req_ty>,
+        ) -> HttpResult<#error_type> {
             log::info!("Creating new {}", stringify!(#entity));
             match #create_fn(db.get_ref(), data.into_inner()).await {
-                Ok(category) => Ok(ApiResponse::success(category, "添加成功").to_http_response()),
+                Ok(r) => Ok(ApiResponse::success(r, "添加成功").to_http_response()),
                 Err(e) => Err(e),
             }
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_delete_code(
     entity: &Ident,
     route_prefix: &LitStr,
@@ -367,115 +277,60 @@ fn generate_delete_code(
     call_expr: &proc_macro2::TokenStream,
     openapi_gen: &OpenApiGenerator,
     id_type_str: &str,
+    error_type: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-    let delete_fn = format_ident!("delete_{}", entity.to_string().to_lowercase());
-    let delete_handler = format_ident!("delete_{}_handler", entity.to_string().to_lowercase());
+    let delete_fn = format_ident!("delete_{}", entity);
+    let handler = format_ident!("delete_{}_handler", entity);
     let full_path = format!("{}/{{id}}", route_prefix.value());
-    let full_permission = format!("{}:delete:id", permission_prefix.value());
-    let openapi_doc = openapi_gen.generate_delete_doc(id_type_str);
+    let perm = format!("{}:delete:id", permission_prefix.value());
+    let doc = openapi_gen.generate_delete_doc(id_type_str);
 
     quote! {
-        pub async fn #delete_fn(
-            db: &DatabaseConnection,
-            #fn_arg,
-        ) ->HttpResult {
-            let entity = #call_expr.one(db)
-                .await
-                .map_err(|e| AppError::DatabaseError(e.to_string()))?
-                .ok_or_else(|| AppError::NotFound(format!("{} not found", id)))?;
-            match entity.delete(db).await {
-                Ok(_res) => Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse,"删除成功").to_http_response()),
-                Err(e) => {
-                    eprintln!("删除失败: {}", e);
-                    Err(AppError::DatabaseConnectionError(db_err_map(e).to_owned()))
-                }
-            }
+        pub async fn #delete_fn(db: &DatabaseConnection, #fn_arg) -> HttpResult<#error_type> {
+            let entity = #call_expr.one(db).await
+                .map_err(|e| #error_type::DatabaseError(e.to_string()))?
+                .ok_or_else(|| #error_type::NotFound(format!("{} not found", id)))?;
+            entity.delete(db).await.map_err(|e| {
+                eprintln!("删除失败: {}", e); #error_type::DatabaseConnectionError(db_err_map(e).into())
+            })?;
+            Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse, "删除成功").to_http_response())
         }
-        #openapi_doc
-        #[crate::route_permission(
-            path = #full_path,
-            method = "delete",
-            permission = #full_permission
-        )]
-        pub async fn #delete_handler(
-            db: web::Data<DatabaseConnection>,
-            id: web::Path<#path_param_type>,
-        ) -> HttpResult {
-            let result = #delete_fn(db.get_ref(), id.into_inner()).await?;
-            Ok(result)
-        }
+        #doc
+        #[crate::route_permission(path = #full_path, method = "delete", permission = #perm)]
+        pub async fn #handler(db: web::Data<DatabaseConnection>, id: web::Path<#path_param_type>,
+        ) -> HttpResult<#error_type> { #delete_fn(db.get_ref(), id.into_inner()).await }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn generate_list_code(
     entity: &Ident,
     route_prefix: &LitStr,
     permission_prefix: &LitStr,
     openapi_gen: &OpenApiGenerator,
+    error_type: &proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
-    let get_fn = format_ident!("get_{}_all", entity.to_string().to_lowercase());
-    let get_handler = format_ident!("get_{}_all_handler", entity.to_string().to_lowercase());
-    let full_path = format!("{}", route_prefix.value());
-    let full_permission = format!("get::{}:read::list", permission_prefix.value());
-    let openapi_doc = openapi_gen.generate_list_doc();
+    let get_fn = format_ident!("get_{}_all", entity);
+    let handler = format_ident!("get_{}_all_handler", entity);
+    let full_path = route_prefix.value().to_string();
+    let perm = format!("get::{}:read::list", permission_prefix.value());
+    let doc = openapi_gen.generate_list_doc();
 
     quote! {
-        #openapi_doc
-        pub async fn #get_fn(
-            db_pool: &DatabaseConnection,
-            page: u64,
-            limit: u64,
-        ) -> Result<HttpResponse,AppError> {
-
-        // 1. 建立分页器
-        let paginator = #entity::Entity::find().paginate(db_pool, limit);
-
-        // 2. 并发拿总数 + 当前页数据（Sea-ORM 顺序执行，但代码简洁）
-        let total = match paginator.num_items().await {
-            Ok(t) => t,
-            Err(e) => {
-                eprintln!("查询{}总数失败: {}",stringify!(#full_path),e);
-                return Err(AppError::DatabaseConnectionError(
-                    "获取失败".to_string(),
-                ));
-            }
-        };
-
-        let data = match paginator.fetch_page(page.saturating_sub(1)).await {
-            Ok(list) => list,
-            Err(e) => {
-                eprintln!("查询{}列表失败: {}",stringify!(#full_path), e);
-                return Err(AppError::DatabaseConnectionError(
-                    "获取列表失败".to_string(),
-                ));
-            }
-        };
-        // 3. 组装成前端需要的分页结构
-        let resp = PaginatedResp {
-            data,
-            pagination:Pagination{
-                total, // u64 -> usize
-                page,
-                limit,
-            }
-        };
-
-        // 4. 统一出口
-            Ok(ApiResponse::success(resp, "获取成功").to_http_response())
+        #doc
+        pub async fn #get_fn(db_pool: &DatabaseConnection, page: u64, limit: u64) -> Result<HttpResponse, #error_type> {
+            let paginator = #entity::Entity::find().paginate(db_pool, limit);
+            let total = paginator.num_items().await
+                .map_err(|e| { eprintln!("查询总数失败: {}", e); #error_type::DatabaseConnectionError("获取失败".into()) })?;
+            let data = paginator.fetch_page(page.saturating_sub(1)).await
+                .map_err(|e| { eprintln!("查询列表失败: {}", e); #error_type::DatabaseConnectionError("获取列表失败".into()) })?;
+            Ok(ApiResponse::success(PaginatedResp { data, pagination: Pagination { total, page, limit } }, "获取成功").to_http_response())
         }
-        #[crate::route_permission(
-            path = #full_path,
-            method = "get",
-            permission = #full_permission
-        )]
-        pub async fn #get_handler(
-            db: web::Data<DatabaseConnection>,
-            query: web::Query<PaginationQuery>,
-        ) -> HttpResult {
-            let PaginationQuery { page, limit ,..} = query.into_inner();
-            let result =  #get_fn(db.as_ref(), page, limit).await?;
-            // 4. 统一出口
-            Ok(result)
+        #[crate::route_permission(path = #full_path, method = "get", permission = #perm)]
+        pub async fn #handler(db: web::Data<DatabaseConnection>, query: web::Query<PaginationQuery>,
+        ) -> HttpResult<#error_type> {
+            let PaginationQuery { page, limit, .. } = query.into_inner();
+            #get_fn(db.as_ref(), page, limit).await
         }
     }
 }

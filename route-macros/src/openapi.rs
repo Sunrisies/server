@@ -32,7 +32,8 @@ impl<'a> OpenApiGenerator<'a> {
 
         let entity = self.entity;
         let summary = self.get_summary(&format!("创建{}", self.openapi_summary.value()));
-        let description = self.get_description(&format!("创建新的{}", self.openapi_summary.value()));
+        let description =
+            self.get_description(&format!("创建新的{}", self.openapi_summary.value()));
         let tag = self.get_tag();
         let route_path = self.route_prefix.value();
         let deprecated_attr = self.get_deprecated_attr();

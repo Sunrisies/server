@@ -1,4 +1,3 @@
-use crate::config::AppError;
 use crate::dto::{PaginatedResp, Pagination, PaginationQuery};
 use crate::models::users;
 use crate::{ApiResponse, HttpResult, RouteInfo};
