@@ -64,7 +64,10 @@ src/
 │   ├── rooms.rs        # 房间管理处理器
 │   ├── room_messages.rs # 消息处理器
 │   ├── upload.rs       # 文件上传处理器
-│   └── email.rs        # 邮件处理器
+│   ├── clipboard.rs    # 云剪贴板处理器
+│   ├── email.rs        # 邮件处理器
+│   ├── images.rs       # 图片管理处理器
+│   └── links.rs        # 外部链接处理器
 │
 ├── services/            # 业务逻辑服务
 │   ├── mod.rs          # 服务模块导出
@@ -74,6 +77,8 @@ src/
 │   ├── category.rs     # 分类服务
 │   ├── email.rs        # 邮件服务
 │   ├── upload.rs       # 文件上传服务
+│   ├── clipboard.rs    # 云剪贴板服务
+│   ├── images.rs       # 图片管理服务
 │   ├── ws.rs           # WebSocket聊天服务
 │   └── sse.rs          # SSE推送服务
 │
@@ -106,8 +111,9 @@ src/
 └── schema/              # Schema定义
     └── user.rs
 
-migration/               # 数据库迁移
-route-macros/            # 自定义路由宏
+migration/               # 数据库迁移（含clipboard.sql）
+route-macros/            # proc-macro 宏库（已发布到 crates.io）
+route-macros-types/      # 共享类型库（ApiResponse 等，已发布到 crates.io）
 ```
 
 ## 3. 架构设计
@@ -264,6 +270,34 @@ posts {
 - 文件类型验证
 - 大小限制
 - 云存储集成
+
+### 4.6 云剪贴板
+
+#### 功能说明
+云剪贴板支持跨设备文本/文件/图片同步，采用频道模式：
+- 管理员创建频道（设置频道名 + 密码）
+- 用户通过频道名 + 密码登录，获取频道 Token
+- 上传/列表/删除操作均通过频道 Token 鉴权
+- 文件存储在七牛云，文本存储在数据库
+
+#### 认证流程
+```
+管理员 → POST /clipboard/channel          # 创建频道（需管理员 JWT）
+用户   → POST /clipboard/channel/auth     # 登录频道 → 获取 channel_token
+用户   → POST /clipboard/text             # 上传文本（需 channel_token）
+用户   → POST /clipboard/file             # 上传文件（需 channel_token）
+用户   → GET  /clipboard                  # 列表（需 channel_token）
+用户   → DELETE /clipboard/{uuid}         # 删除（需 channel_token）
+```
+
+#### 数据模型
+- `clipboard_channels` — 频道表（name + password_hash）
+- `clipboard_entries` — 条目表（type/content/file_url/channel_id）
+
+#### 频道 Token
+- 独立 JWT 体系（不与用户 JWT 共用密钥）
+- 密钥来源：`CHANNEL_SECRET` 环境变量 → fallback `JWT_SECRET`
+- 通过 `Authorization: Bearer <token>` 或 `?token=<token>` 传递
 
 ## 5. 数据流
 
