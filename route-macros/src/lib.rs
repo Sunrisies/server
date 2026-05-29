@@ -1,6 +1,5 @@
 mod args;
 mod crud;
-mod log;
 mod openapi;
 mod route_permission;
 
@@ -14,10 +13,4 @@ pub fn route_permission(
 #[proc_macro]
 pub fn crud_entity(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     crud::crud_entity(input)
-}
-
-/// 刷新并显示所有日志
-#[proc_macro]
-pub fn flush_crud_logs(_input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    log::flush_crud_logs(_input)
 }

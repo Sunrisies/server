@@ -32,6 +32,7 @@ pub enum IdType {
 pub enum CrudOperation {
     Create,
     Read,
+    Update,
     Delete,
     List,
 }
@@ -45,6 +46,8 @@ pub struct CrudEntityConfig {
     pub id_type: Option<IdType>,
     pub operations: Option<Vec<CrudOperation>>,
     pub create_request_type: Option<Ident>,
+    pub update_request_type: Option<Ident>,
+    pub unique_field: Option<Ident>,
     pub custom_queries: Option<Vec<CustomQueryType>>, // 新增：自定义查询类型
     pub custom_list_fn: Option<Ident>,                // 新增：自定义列表查询函数名
     pub custom_read_fn: Option<Ident>,                // 新增：自定义详情查询函数名
@@ -53,6 +56,7 @@ pub struct CrudEntityConfig {
     pub openapi_create: Option<OpenApiConfig>,
     pub openapi_read: Option<OpenApiConfig>,
     pub openapi_list: Option<OpenApiConfig>,
+    pub openapi_update: Option<OpenApiConfig>,
     pub openapi_delete: Option<OpenApiConfig>,
 }
 
@@ -66,6 +70,8 @@ impl Parse for CrudEntityConfig {
         let mut id_type = None;
         let mut operations = None;
         let mut create_request_type = None;
+        let mut update_request_type = None;
+        let mut unique_field = None;
         let mut custom_queries = None;
         let mut custom_list_fn = None;
         let mut custom_read_fn = None;
@@ -73,6 +79,7 @@ impl Parse for CrudEntityConfig {
         let mut openapi_create = None;
         let mut openapi_read = None;
         let mut openapi_list = None;
+        let mut openapi_update = None;
         let mut openapi_delete = None;
         while !content.is_empty() {
             let key: Ident = content.parse()?;
@@ -108,6 +115,7 @@ impl Parse for CrudEntityConfig {
                                 match lit_str.value().as_str() {
                                     "create" => ops.push(CrudOperation::Create),
                                     "read" => ops.push(CrudOperation::Read),
+                                    "update" => ops.push(CrudOperation::Update),
                                     "delete" => ops.push(CrudOperation::Delete),
                                     "list" => ops.push(CrudOperation::List),
                                     _ => {
@@ -125,6 +133,14 @@ impl Parse for CrudEntityConfig {
                 "create_request_type" => {
                     let value: Ident = content.parse()?;
                     create_request_type = Some(value);
+                }
+                "update_request_type" => {
+                    let value: Ident = content.parse()?;
+                    update_request_type = Some(value);
+                }
+                "unique_field" => {
+                    let value: Ident = content.parse()?;
+                    unique_field = Some(value);
                 }
                 "custom_queries" => {
                     let array: ExprArray = content.parse()?;
@@ -172,6 +188,10 @@ impl Parse for CrudEntityConfig {
                     let config = parse_openapi_config(&&content)?;
                     openapi_list = Some(config);
                 }
+                "openapi_update" => {
+                    let config = parse_openapi_config(&&content)?;
+                    openapi_update = Some(config);
+                }
                 "openapi_delete" => {
                     let config = parse_openapi_config(&&content)?;
                     openapi_delete = Some(config);
@@ -195,6 +215,8 @@ impl Parse for CrudEntityConfig {
             id_type,
             operations,
             create_request_type,
+            update_request_type,
+            unique_field,
             custom_queries,
             custom_list_fn,
             custom_read_fn,
@@ -202,6 +224,7 @@ impl Parse for CrudEntityConfig {
             openapi_create,
             openapi_read,
             openapi_list,
+            openapi_update,
             openapi_delete,
         })
     }

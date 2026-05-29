@@ -1,6 +1,6 @@
 use super::openapi::OpenApiGenerator;
 use crate::args::{CrudEntityConfig, CrudOperation, CustomQueryType, IdType};
-use crate::log::{LOGGER, LogLevel};
+
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Ident, LitStr, parse_macro_input};
@@ -50,6 +50,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
 
     let mut create_code = quote! {};
     let mut read_code = quote! {};
+    let mut update_code = quote! {};
     let mut delete_code = quote! {};
     let mut list_code = quote! {};
 
@@ -77,6 +78,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                     route_prefix,
                     permission_prefix,
                     &config.create_request_type,
+                    &config.unique_field,
                     &create_openapi_gen,
                 );
                 operation_logs.push(format!(
@@ -106,6 +108,20 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
                 );
                 operation_logs.push(format!(
                     "读取操作: get_{}_handler",
+                    entity.to_string().to_lowercase()
+                ));
+            }
+            CrudOperation::Update => {
+                let _update_openapi_gen = OpenApiGenerator::new(
+                    entity,
+                    route_prefix,
+                    &openapi_summary,
+                    config.openapi_update.as_ref(),
+                );
+                // 目前 update 未实现生成函数，预留
+                update_code = quote! {};
+                operation_logs.push(format!(
+                    "更新操作: update_{}_handler（待实现，需手写）",
                     entity.to_string().to_lowercase()
                 ));
             }
@@ -154,60 +170,19 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
         }
     }
 
-    // 记录到日志
-    LOGGER.with(|logger| {
-        let mut logger = logger.borrow_mut();
-        logger.log(
-            &module_name,
-            LogLevel::Info,
-            format!(
-                "实体: {}, 路由前缀: {}, 权限前缀: {}",
-                entity,
-                route_prefix.value(),
-                permission_prefix.value()
-            ),
-        );
-
-        logger.log(
-            &module_name,
-            LogLevel::Success,
-            format!("ID类型: {:?}, 操作数量: {}", id_type, operations.len()),
-        );
-
-        for op_log in operation_logs {
-            logger.log(&module_name, LogLevel::Debug, op_log);
-        }
-
-        logger.log(
-            &module_name,
-            LogLevel::Info,
-            format!("生成模块: {}", mod_name),
-        );
-    });
-    // 记录自定义查询信息
+    // 编译时输出日志
+    eprintln!("[route-macros] {}: {} 路由/{} 权限, {} 操作",
+        module_name, route_prefix.value(), permission_prefix.value(), operations.len());
+    for op_log in &operation_logs {
+        eprintln!("[route-macros]   └─ {}", op_log);
+    }
     if use_custom_list || use_custom_read {
-        let mut custom_logs = Vec::new();
-        if use_custom_list {
-            if let Some(ref fn_name) = custom_list_fn {
-                custom_logs.push(format!("自定义列表函数: {}", fn_name));
-            } else {
-                custom_logs.push("自定义列表函数: 使用默认命名".to_string());
-            }
+        if let Some(ref fn_name) = custom_list_fn {
+            eprintln!("[route-macros]   └─ 自定义列表: {}", fn_name);
         }
-        if use_custom_read {
-            if let Some(ref fn_name) = custom_read_fn {
-                custom_logs.push(format!("自定义详情函数: {}", fn_name));
-            } else {
-                custom_logs.push("自定义详情函数: 使用默认命名".to_string());
-            }
+        if let Some(ref fn_name) = custom_read_fn {
+            eprintln!("[route-macros]   └─ 自定义详情: {}", fn_name);
         }
-
-        LOGGER.with(|logger| {
-            let mut logger = logger.borrow_mut();
-            for log in custom_logs {
-                logger.log(&module_name, LogLevel::Info, log);
-            }
-        });
     }
 
     let output = quote! {
@@ -215,6 +190,7 @@ pub fn crud_entity(input: TokenStream) -> TokenStream {
             use super::*;
             #create_code
             #read_code
+            #update_code
             #delete_code
             #list_code
         }
@@ -251,10 +227,10 @@ fn generate_read_code(
             )]
             pub async fn #get_handler(
                 db: web::Data<DatabaseConnection>,
-                query: web::Query<PaginationQuery>,
+                path: web::Path<#path_param_type>,
             ) -> HttpResult {
-                let PaginationQuery { page, limit,.. } = query.into_inner();
-                match #custom_fn_name(db.get_ref(), page, limit).await {
+                let id = path.into_inner();
+                match #custom_fn_name(db.get_ref(), id).await {
                     Ok(result) => Ok(result),
                     Err(e) => {
                         log::error!("自定义查询失败: {}", e);
@@ -304,6 +280,7 @@ fn generate_create_code(
     route_prefix: &LitStr,
     permission_prefix: &LitStr,
     create_request_type: &Option<Ident>,
+    unique_field: &Option<Ident>,
     openapi_gen: &OpenApiGenerator,
 ) -> proc_macro2::TokenStream {
     let create_fn = format_ident!("create_{}", entity.to_string().to_lowercase());
@@ -324,6 +301,20 @@ fn generate_create_code(
     };
     let openapi_doc = openapi_gen.generate_create_doc(create_request_type);
 
+    // 唯一性检查代码（根据是否有 unique_field 配置决定）
+    let unique_check_code = if let Some(field) = unique_field {
+        let field_lower = Ident::new(&field.to_string().to_lowercase(), field.span());
+        quote! {
+            if let Some(_existing) = #entity::Entity::check_unique(
+                db, <#entity::Column>::#field, data.#field_lower.to_string(),
+            ).await? {
+                return Err(AppError::DatabaseConnectionError("已存在".to_string()));
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         use validator::Validate;
         pub async fn #create_fn(
@@ -331,15 +322,17 @@ fn generate_create_code(
             data: #create_request_type,
         ) ->Result<#entity::Model, AppError> {
             if let Err(errors) = data.validate() {
-                println!("Validation errors: {:?}", errors);
+                eprintln!("Validation errors: {:?}", errors);
                 let msg = ValidationErrorJson::from_validation_errors(&errors);
                 return Err(AppError::ValidationError(msg));
             }
-            check_unique_field!(#entity, db, Name, data.name);
+            // 唯一性检查（通过 unique_field 配置，如 unique_field: Name）
+            #unique_check_code
+
             let active_model = #entity::ActiveModel::from(data);
 
             let model = active_model.insert(db).await.map_err(|e| {
-                println!("添加失败: {}", e);
+                eprintln!("添加失败: {}", e);
                 AppError::DatabaseConnectionError(db_err_map(e).to_owned())
             })?;
 
@@ -393,7 +386,7 @@ fn generate_delete_code(
             match entity.delete(db).await {
                 Ok(_res) => Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse,"删除成功").to_http_response()),
                 Err(e) => {
-                    println!("删除失败: {}", e);
+                    eprintln!("删除失败: {}", e);
                     Err(AppError::DatabaseConnectionError(db_err_map(e).to_owned()))
                 }
             }
@@ -441,7 +434,7 @@ fn generate_list_code(
         let total = match paginator.num_items().await {
             Ok(t) => t,
             Err(e) => {
-                println!("查询{}总数失败: {}",stringify!(#full_path),e);
+                eprintln!("查询{}总数失败: {}",stringify!(#full_path),e);
                 return Err(AppError::DatabaseConnectionError(
                     "获取失败".to_string(),
                 ));
@@ -451,13 +444,12 @@ fn generate_list_code(
         let data = match paginator.fetch_page(page.saturating_sub(1)).await {
             Ok(list) => list,
             Err(e) => {
-                println!("查询{}列表失败: {}",stringify!(#full_path), e);
+                eprintln!("查询{}列表失败: {}",stringify!(#full_path), e);
                 return Err(AppError::DatabaseConnectionError(
                     "获取列表失败".to_string(),
                 ));
             }
         };
-        log::info!("data:{:?}", data);
         // 3. 组装成前端需要的分页结构
         let resp = PaginatedResp {
             data,

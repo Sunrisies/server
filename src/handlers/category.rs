@@ -16,5 +16,6 @@ crud_entity!({
     id_type:"id",
     operations: ["create","list","delete","read"],
     create_request_type: CreateCategoryRequest,
+    unique_field: Name,
     openapi_summary: "分类",
 });

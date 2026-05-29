@@ -22,6 +22,7 @@ crud_entity!({
     id_type:"id",
     operations: ["create","list","delete","read"],
     create_request_type: CreateTagRequest,
+    unique_field: Name,
     openapi_summary: "标签",
 
 });
