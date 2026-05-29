@@ -45,7 +45,7 @@ use utoipa::OpenApi;
         contact(
             name = "Sunrisies",
             email = "3266420686@qq.com",
-            url = "https://github.com/Sunrisies/rust-web"
+            url = "https://github.com/Sunrisies/server"
         ),
     ),
     paths(

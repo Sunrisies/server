@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "route-macros",
     "route-macros-types",
 ]
 resolver = "2"
@@ -9,6 +10,7 @@ name = "web-server"
 version = "0.1.20"
 edition = "2024"
 license = "MIT"
+authors = ["Sunrisies <3266420686@qq.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

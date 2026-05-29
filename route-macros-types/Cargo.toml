@@ -1,9 +1,10 @@
 [package]
 name = "route-macros-types"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 rust-version = "1.85"
+authors = ["Sunrisies <3266420686@qq.com>"]
 description = "Shared types for route-macros: ApiResponse, EmptyResponse, HttpResult, PaginatedResp, etc."
 repository = "https://github.com/Sunrisies/server"
 keywords = ["actix-web", "crud", "openapi", "api-response"]

@@ -3458,10 +3458,11 @@ dependencies = [
 
 [[package]]
 name = "route-macros"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
+ "route-macros-types 0.1.0",
  "syn 2.0.117",
  "utoipa",
 ]
@@ -3469,6 +3470,21 @@ dependencies = [
 [[package]]
 name = "route-macros-types"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7251f961ef54e7c29f2e18419c76ed98fa3f3052942a1471cf7c642add075d63"
+dependencies = [
+ "actix-web",
+ "log",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "utoipa",
+ "validator",
+]
+
+[[package]]
+name = "route-macros-types"
+version = "0.1.1"
 dependencies = [
  "actix-web",
  "log",
@@ -5029,7 +5045,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "route-macros",
- "route-macros-types",
+ "route-macros-types 0.1.1",
  "sea-orm",
  "serde",
  "serde_json",
