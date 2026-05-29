@@ -3462,7 +3462,6 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "route-macros-types",
  "syn 2.0.117",
  "utoipa",
 ]

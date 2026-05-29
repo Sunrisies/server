@@ -14,7 +14,7 @@ syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 utoipa = "5.4.0"
-route-macros-types = { version = "0.1", path = "../route-macros-types" }
+# route-macros-types = "0.1" (commented during publish)
 
 [lib]
 proc-macro = true

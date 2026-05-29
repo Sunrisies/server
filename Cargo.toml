@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "route-macros",
     "route-macros-types",
 ]
 resolver = "2"
