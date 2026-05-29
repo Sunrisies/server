@@ -3,15 +3,18 @@ name = "route-macros"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-
+rust-version = "1.85"
+description = "Procedural macros for auto-generating Actix-web CRUD handlers with OpenAPI docs"
+repository = "https://github.com/Sunrisies/server"
+keywords = ["actix-web", "crud", "openapi", "macros", "sea-orm"]
+categories = ["web-programming", "development-tools::procedural-macro-handlers"]
 
 [dependencies]
 syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 utoipa = "5.4.0"
-route-macros-types = { path = "../route-macros-types" }
-
+route-macros-types = { version = "0.1", path = "../route-macros-types" }
 
 [lib]
 proc-macro = true

@@ -3,6 +3,11 @@ name = "route-macros-types"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+rust-version = "1.85"
+description = "Shared types for route-macros: ApiResponse, EmptyResponse, HttpResult, PaginatedResp, etc."
+repository = "https://github.com/Sunrisies/server"
+keywords = ["actix-web", "crud", "openapi", "api-response"]
+categories = ["web-programming"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
