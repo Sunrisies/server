@@ -11,7 +11,7 @@
 - [ ] **route-macros 实现 Update 操作** — `CrudOperation::Update` 枚举已加，但 `generate_update_code` 未实现
 - [ ] **generate_delete_doc 缺少 deprecated 属性** — create/read/list 都有，唯独 delete 没有
 - [ ] **路由匹配问题** — `routes/posts.rs` 中 `/prevNext/{uuid:.*}` 可能抢 `/uploadTime`
-- [ ] **CI 未执行测试** — GitHub Actions 安装了 nextest 但没有 `cargo test` 步骤
+- [ ] **CI 未执行测试** — GitHub Actions 安装了 nextest，需配置 `cargo test -- --test-threads=1`
 - [ ] **验证码存在 HashMap 里** — 服务重启验证码丢失
 
 ## 🟢 低优先级

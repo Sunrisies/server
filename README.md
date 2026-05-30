@@ -74,6 +74,22 @@ cargo run -p web-server
 # API 文档生成在 openapi.json
 ```
 
+### 测试
+
+测试使用独立的 PostgreSQL 测试数据库，与生产库隔离。
+
+在 `.env` 中配置 `DATABASE_URL_TEST`：
+
+```env
+DATABASE_URL_TEST=postgres://postgres:password@localhost:5432/test
+```
+
+运行测试（需单线程，共享同一数据库）：
+
+```bash
+cargo test -- --test-threads=1
+```
+
 ## 项目结构
 
 ```
