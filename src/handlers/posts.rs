@@ -1,4 +1,4 @@
-use actix_web::{HttpMessage, HttpRequest};
+use actix_web::{HttpMessage, HttpRequest, web};
 
 use crate::EmptyResponse;
 use crate::config::AppError;
@@ -28,7 +28,6 @@ fn current_user_id(req: &HttpRequest) -> Option<i32> {
         None
     }
 }
-use actix_web::web;
 use sea_orm::RelationTrait;
 use sea_orm::{
     ColumnTrait,
@@ -501,6 +500,48 @@ pub async fn delete_post_handler(
         Ok(()) => Ok(
             ApiResponse::<EmptyResponse>::success(EmptyResponse, "文章删除成功").to_http_response(),
         ),
+        Err(e) => Ok(ApiResponse::from(e).to_http_response()),
+    }
+}
+
+/// 增加文章阅读数
+#[utoipa::path(
+    post,
+    path = "/api/v1/posts/{uuid}/view",
+    tag = "文章",
+    summary = "增加文章阅读数",
+    description = "阅读文章时调用，view_count +1（前端需自行去重）",
+    params(("uuid" = String, Path, description = "文章 UUID")),
+    responses(
+        (status = 200, description = "更新成功", body = crate::ApiResponse<crate::EmptyResponse>),
+        (status = 404, description = "文章不存在"),
+        (status = 500, description = "服务器内部错误"),
+    ),
+)]
+pub async fn view_post_handler(
+    req: HttpRequest,
+    db_pool: web::Data<DatabaseConnection>,
+    path: web::Path<String>,
+) -> HttpResult {
+    let uuid = path.into_inner();
+    // 获取客户端 IP
+    let ip = req
+        .headers()
+        .get("X-Forwarded-For")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next().map(|s| s.trim().to_string()))
+        .or_else(|| {
+            req.headers()
+                .get("X-Real-IP")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        })
+        .or_else(|| req.peer_addr().map(|addr| addr.ip().to_string()))
+        .unwrap_or_else(|| "unknown".to_string());
+    match crate::services::posts::PostService::increment_view(db_pool.as_ref(), &uuid, &ip).await {
+        Ok(_) => {
+            Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse, "成功").to_http_response())
+        }
         Err(e) => Ok(ApiResponse::from(e).to_http_response()),
     }
 }

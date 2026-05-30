@@ -20,7 +20,7 @@ use crate::handlers::links::external_links_routes::{
 use crate::handlers::posts::{
     __path_create_post_handler, __path_delete_post_handler, __path_get_posts_all_handler,
     __path_get_posts_handler, __path_get_prev_next_handler, __path_get_timeline_handler,
-    __path_update_post_handler,
+    __path_update_post_handler, __path_view_post_handler,
 };
 use crate::handlers::room_messages::__path_get_room_messages_handler;
 use crate::handlers::rooms::{__path_create_room_handler, __path_get_room_handler};
@@ -61,6 +61,7 @@ use utoipa::OpenApi;
         create_post_handler,
         update_post_handler,
         delete_post_handler,
+        view_post_handler,
         // 分类
         get_categories_all,
         get_categories_handler,

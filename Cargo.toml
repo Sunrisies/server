@@ -52,6 +52,9 @@ validator = { version = "0.20.0", features = ["derive"] }
 route-macros = { path = "./route-macros" }
 route-macros-types = { path = "./route-macros-types" }
 inventory = "0.3.21"
+ureq = "2"
+hmac = "0.12"
+sha1 = "0.10"
 actix-rt = "2.11.0"
 actix-multipart = "0.7.2"
 image = { version = "0.25.8", default-features = false, features = [

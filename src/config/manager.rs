@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use std::{env, sync::LazyLock};
 
-use crate::{email::SmtpSettings, upload::QiNiuSettings};
+use crate::{email::SmtpSettings, services::qiniu::QiNiuSettings};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerSettings {
