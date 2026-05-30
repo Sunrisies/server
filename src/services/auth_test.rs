@@ -8,92 +8,19 @@ mod tests {
     use actix_web::web;
     use chrono::Utc;
     use sea_orm::{
-        ActiveModelTrait, ColumnTrait, ConnectionTrait, Database, DatabaseConnection, EntityTrait,
-        PaginatorTrait, QueryFilter, QueryOrder, Set, Statement,
+        ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+        QueryFilter, QueryOrder, Set,
     };
 
     // 测试数据库连接和初始化
     async fn setup_test_db() -> DatabaseConnection {
-        // 使用 SQLite 内存数据库进行测试
-        let db = Database::connect("sqlite::memory:")
-            .await
-            .expect("Failed to connect to test database");
-
-        // 运行迁移
-        create_test_tables(&db).await;
+        let db = crate::test_helpers::setup_test_db().await;
         create_test_roles(&db).await;
-
         db
     }
 
     // 创建测试所需的表
-    async fn create_test_tables(db: &DatabaseConnection) {
-        // 简化的表创建，实际项目中应该使用迁移文件
 
-        // 创建用户表
-        let create_users_table = Statement::from_string(
-            db.get_database_backend(),
-            r#"
-            CREATE TABLE users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                uuid TEXT NOT NULL UNIQUE,
-                user_name TEXT NOT NULL UNIQUE,
-                pass_word TEXT NOT NULL,
-                email TEXT UNIQUE,
-                image TEXT,
-                phone TEXT UNIQUE,
-                binding TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            "#
-            .to_string(),
-        );
-        db.execute(create_users_table)
-            .await
-            .expect("Failed to create users table");
-
-        // 创建角色表
-        let create_roles_table = Statement::from_string(
-            db.get_database_backend(),
-            r#"
-            CREATE TABLE roles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code TEXT NOT NULL UNIQUE,
-                name TEXT NOT NULL,
-                description TEXT,
-                is_system INTEGER,
-                created_at TEXT
-            )
-            "#
-            .to_string(),
-        );
-        db.execute(create_roles_table)
-            .await
-            .expect("Failed to create roles table");
-
-        // 创建用户角色关联表
-        let create_user_roles_table = Statement::from_string(
-            db.get_database_backend(),
-            r#"
-            CREATE TABLE user_roles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                role_id INTEGER,
-                is_primary INTEGER,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
-            )
-            "#
-            .to_string(),
-        );
-        db.execute(create_user_roles_table)
-            .await
-            .expect("Failed to create user_roles table");
-    }
-
-    // 创建测试所需的角色
     async fn create_test_roles(db: &DatabaseConnection) {
         // 创建普通用户角色
         let user_role = roles::ActiveModel {

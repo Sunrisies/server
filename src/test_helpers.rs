@@ -128,8 +128,8 @@ const MIGRATIONS: &[(&str, &str)] = &[
     (
         "user_roles",
         "CREATE TABLE IF NOT EXISTS user_roles (
-        id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id),
-        role_id INTEGER REFERENCES roles(id),
+        id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
         is_primary BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     )",
