@@ -70,4 +70,7 @@ pub fn get_all_routes() -> Result<Vec<RouteInfo>, AppError> {
         .map_err(|e| AppError::InternalServerError(format!("读取路由注册表失败: {e}")))?;
     Ok(registry.values().cloned().collect())
 }
+#[cfg(test)]
+pub mod test_helpers;
+
 use crate::config::AppError;
