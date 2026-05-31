@@ -1,6 +1,8 @@
 use crate::ApiResponse;
+use crate::RouteInfo;
 use crate::config::AppError;
 use crate::dto::user::ValidationErrorJson;
+use crate::route_permission;
 use crate::services::{EmailService, EmailVerificationManager};
 use actix_web::{HttpResponse, web};
 use serde::{Deserialize, Serialize};
@@ -27,7 +29,7 @@ pub struct SendVerificationCodeResponse {
 /// 发送邮箱验证码
 #[utoipa::path(
     post,
-    path = "/api/email/send-verification-code",
+    path = "/api/v1/email/send-verification-code",
     tag = "邮件",
     summary = "发送邮箱验证码",
     request_body = SendVerificationCodeRequest,
@@ -36,6 +38,11 @@ pub struct SendVerificationCodeResponse {
         (status = 400, description = "请求参数错误", body = ApiResponse<ValidationErrorJson>),
         (status = 500, description = "服务器内部错误", body = ApiResponse<ValidationErrorJson>)
     )
+)]
+#[route_permission(
+    path = "/api/v1/email/send-verification-code",
+    method = "post",
+    permission = "email:send_code"
 )]
 pub async fn send_verification_code(
     request: web::Json<SendVerificationCodeRequest>,
