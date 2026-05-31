@@ -42,7 +42,7 @@ impl EmailService {
     }
 
     /// 发送验证码邮件
-    pub fn send_verification_code(&self, to_email: &str, code: &str) -> Result<()> {
+    pub async fn send_verification_code(&self, to_email: &str, code: &str) -> Result<()> {
         let subject = "博客系统验证码";
         let body = format!(
             r#"
@@ -62,12 +62,11 @@ impl EmailService {
             code,
             self.settings.code_validity_period / 60
         );
-        // Ok(())
-        self.send_email(to_email, subject, &body)
+        self.send_email(to_email, subject, &body).await
     }
 
     /// 发送密码重置邮件
-    pub fn send_password_reset(&self, to_email: &str, reset_link: &str) -> Result<()> {
+    pub async fn send_password_reset(&self, to_email: &str, reset_link: &str) -> Result<()> {
         let subject = "博客系统密码重置";
         let body = format!(
             r#"
@@ -91,7 +90,7 @@ impl EmailService {
             self.settings.code_validity_period / 60
         );
 
-        self.send_email(to_email, subject, &body)
+        self.send_email(to_email, subject, &body).await
     }
 
     /// 发送欢迎邮件
@@ -114,7 +113,7 @@ impl EmailService {
             username
         );
 
-        self.send_email(to_email, subject, &body)
+        self.send_email(to_email, subject, &body).await
     }
 
     /// 发送新评论通知邮件
@@ -122,7 +121,7 @@ impl EmailService {
     /// # Errors
     ///
     /// 当邮件发送失败（如 SMTP 连接错误、认证失败或收件人地址无效）时返回 `Err`。
-    pub fn send_comment_notification(
+    pub async fn send_comment_notification(
         &self,
         to_email: &str,
         author_name: &str,
@@ -151,58 +150,61 @@ impl EmailService {
             author_name, post_title, comment_content, comment_link
         );
 
-        self.send_email(to_email, subject, &body)
+        self.send_email(to_email, subject, &body).await
     }
 
-    /// 发送邮件的通用方法
-    fn send_email(&self, to_email: &str, subject: &str, body: &str) -> Result<()> {
-        // 创建邮件
-        let email = Message::builder()
-            .from(
-                self.settings
-                    .from_email
-                    .parse()
-                    .context("Invalid from email address")?,
-            )
-            .to(to_email.parse().context("Invalid to email address")?)
-            .subject(subject)
-            .multipart(
-                lettre::message::MultiPart::alternative()
-                    .singlepart(
-                        lettre::message::SinglePart::builder()
-                            .header(lettre::message::header::ContentType::TEXT_PLAIN)
-                            .body(self.html_to_text(body)),
-                    )
-                    .singlepart(
-                        lettre::message::SinglePart::builder()
-                            .header(lettre::message::header::ContentType::TEXT_HTML)
-                            .body(body.to_string()),
-                    ),
-            )
-            .context("Failed to build email")?;
+    /// 发送邮件的通用方法（异步，通过 spawn_blocking 避免阻塞 worker）
+    async fn send_email(&self, to_email: &str, subject: &str, body: &str) -> Result<()> {
+        let settings = self.settings.clone();
+        let to_email = to_email.to_string();
+        let subject = subject.to_string();
+        let body = body.to_string();
+        let html_text = self.html_to_text(&body);
 
-        // 创建SMTP传输
-        let creds = Credentials::new(
-            self.settings.from_email.clone(),
-            self.settings.from_password.clone(),
-        );
-        let mailer = SmtpTransport::relay(&self.settings.smtp_server)
-            .context("Failed to create SMTP transport")?
-            .port(self.settings.smtp_port)
-            .credentials(creds)
-            .build();
+        tokio::task::spawn_blocking(move || {
+            let email = Message::builder()
+                .from(
+                    settings
+                        .from_email
+                        .parse()
+                        .context("Invalid from email address")?,
+                )
+                .to(to_email.parse().context("Invalid to email address")?)
+                .subject(&subject)
+                .multipart(
+                    lettre::message::MultiPart::alternative()
+                        .singlepart(
+                            lettre::message::SinglePart::builder()
+                                .header(lettre::message::header::ContentType::TEXT_PLAIN)
+                                .body(html_text),
+                        )
+                        .singlepart(
+                            lettre::message::SinglePart::builder()
+                                .header(lettre::message::header::ContentType::TEXT_HTML)
+                                .body(body),
+                        ),
+                )
+                .context("Failed to build email")?;
 
-        // 发送邮件
-        match mailer.send(&email) {
-            Ok(_) => {
-                log::info!("Email successfully sent to {to_email}");
-                Ok(())
-            }
-            Err(e) => {
+            let creds =
+                Credentials::new(settings.from_email.clone(), settings.from_password.clone());
+            let mailer = SmtpTransport::relay(&settings.smtp_server)
+                .context("Failed to create SMTP transport")?
+                .port(settings.smtp_port)
+                .credentials(creds)
+                .timeout(Some(Duration::from_secs(15))) // 15 秒超时
+                .build();
+
+            mailer.send(&email).map_err(|e| {
                 log::error!("Could not send email to {to_email}: {e:?}");
-                Err(anyhow::anyhow!("Failed to send email: {e}"))
-            }
-        }
+                anyhow::anyhow!("Failed to send email: {e}")
+            })?;
+
+            log::info!("Email successfully sent to {to_email}");
+            Ok(())
+        })
+        .await
+        .context("SMTP 发送线程异常")?
     }
 
     /// 简单的HTML到纯文本转换
@@ -331,7 +333,7 @@ impl EmailVerificationManager {
         }
 
         // 发送邮件
-        email_service.send_verification_code(email, &code)?;
+        email_service.send_verification_code(email, &code).await?;
 
         Ok(code)
     }
