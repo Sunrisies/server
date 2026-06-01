@@ -77,11 +77,29 @@ const MIGRATIONS: &[(&str, &str)] = &[
     )",
     ),
     (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    ),
+    (
         "roles",
         "CREATE TABLE IF NOT EXISTS roles (
         id SERIAL PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE,
         name VARCHAR(255) NOT NULL, description TEXT, is_system BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )",
+    ),
+    (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
     ),
     (
@@ -91,6 +109,15 @@ const MIGRATIONS: &[(&str, &str)] = &[
         slug VARCHAR(255) NOT NULL UNIQUE, description TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )",
+    ),
+    (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
     ),
     (
@@ -110,6 +137,15 @@ const MIGRATIONS: &[(&str, &str)] = &[
     )",
     ),
     (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    ),
+    (
         "tags",
         "CREATE TABLE IF NOT EXISTS tags (
         id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL UNIQUE,
@@ -119,10 +155,28 @@ const MIGRATIONS: &[(&str, &str)] = &[
     )",
     ),
     (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    ),
+    (
         "post_tags",
         "CREATE TABLE IF NOT EXISTS post_tags (
         id SERIAL PRIMARY KEY, post_id INTEGER NOT NULL REFERENCES posts(id),
         tag_id INTEGER NOT NULL REFERENCES tags(id)
+    )",
+    ),
+    (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
     ),
     (
@@ -135,12 +189,30 @@ const MIGRATIONS: &[(&str, &str)] = &[
     )",
     ),
     (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )",
+    ),
+    (
         "post_views",
         "CREATE TABLE IF NOT EXISTS post_views (
         id BIGSERIAL PRIMARY KEY, post_id INTEGER NOT NULL REFERENCES posts(id),
         ip VARCHAR(45) NOT NULL, viewed_date DATE NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(post_id, ip, viewed_date)
+    )",
+    ),
+    (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
     ),
     (
@@ -151,6 +223,15 @@ const MIGRATIONS: &[(&str, &str)] = &[
         filename VARCHAR(255) NOT NULL, file_size BIGINT NOT NULL,
         mime_type VARCHAR(128) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )",
+    ),
+    (
+        "verification_codes",
+        "CREATE TABLE IF NOT EXISTS verification_codes (
+        id BIGSERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     )",
     ),
 ];

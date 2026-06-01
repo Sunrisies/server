@@ -2,6 +2,9 @@ use anyhow::{Context, Result};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use rand::Rng;
+use sea_orm::ActiveModelTrait;
+use sea_orm::DatabaseConnection;
+use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -295,7 +298,8 @@ impl EmailVerificationCode {
 
 /// 邮件验证码管理器
 pub struct EmailVerificationManager {
-    /// 验证码缓存（生产环境应使用Redis等）
+    /// 验证码缓存（保留兼容，实际已使用 DB）
+    #[allow(dead_code)]
     codes: std::sync::Arc<
         tokio::sync::RwLock<std::collections::HashMap<String, EmailVerificationCode>>,
     >,
@@ -316,64 +320,72 @@ impl EmailVerificationManager {
         }
     }
 
-    /// 生成并发送验证码
+    /// 生成并发送验证码（存储到数据库）
     pub async fn generate_and_send_code(
         &self,
+        db: &DatabaseConnection,
         email_service: &EmailService,
         email: &str,
     ) -> Result<String> {
-        // 生成验证码
         let code = EmailService::generate_verification_code();
+        let now = chrono::Utc::now();
+        let expires_at = now + chrono::Duration::seconds(self.validity_period as i64);
 
-        // 存储验证码
-        let verification_code = EmailVerificationCode::new(email.to_string(), code.clone());
-        {
-            let mut codes = self.codes.write().await;
-            codes.insert(email.to_string(), verification_code);
+        use crate::models::verification_codes;
+        verification_codes::ActiveModel {
+            email: Set(email.to_string()),
+            code: Set(code.clone()),
+            expires_at: Set(expires_at),
+            used: Set(false),
+            created_at: Set(now),
+            ..Default::default()
         }
+        .insert(db)
+        .await
+        .map_err(|e| anyhow::anyhow!("保存验证码失败: {e}"))?;
 
-        // 发送邮件
         email_service.send_verification_code(email, &code).await?;
-
         Ok(code)
     }
 
-    /// 验证验证码
-    pub async fn verify_code(&self, email: &str, code: &str) -> Result<bool> {
-        let mut codes = self.codes.write().await;
-        match codes.get_mut(email) {
-            Some(verification_code) if verification_code.is_valid(code, self.validity_period) => {
-                verification_code.mark_used();
-                Ok(true)
-            }
-            _ => Ok(false),
+    /// 验证验证码（从数据库查询）
+    pub async fn verify_code(
+        &self,
+        db: &DatabaseConnection,
+        email: &str,
+        code: &str,
+    ) -> Result<bool> {
+        use crate::models::verification_codes;
+        let now = chrono::Utc::now();
+        let record = verification_codes::Entity::find()
+            .filter(verification_codes::Column::Email.eq(email))
+            .filter(verification_codes::Column::Code.eq(code))
+            .filter(verification_codes::Column::Used.eq(false))
+            .filter(verification_codes::Column::ExpiresAt.gt(now))
+            .one(db)
+            .await
+            .map_err(|e| anyhow::anyhow!("查询验证码失败: {e}"))?;
+
+        if let Some(record) = record {
+            let mut active: verification_codes::ActiveModel = record.into();
+            active.used = Set(true);
+            active
+                .update(db)
+                .await
+                .map_err(|e| anyhow::anyhow!("更新验证码失败: {e}"))?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
     }
 
     /// 启动定期清理过期验证码的任务
     pub fn start_cleanup_task(&self) {
-        let codes = self.codes.clone();
-        let validity_period = self.validity_period;
-
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(60 * 5)); // 每5分钟清理一次
-
+            let mut interval = tokio::time::interval(Duration::from_secs(3600));
             loop {
                 interval.tick().await;
-
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-
-                let mut codes = codes.write().await;
-                codes.retain(|_, verification_code| {
-                    // 保留未使用且未过期的验证码
-                    !verification_code.used
-                        && (now - verification_code.created_at) <= validity_period
-                });
-
-                log::debug!("Cleaned up expired email verification codes");
+                log::debug!("验证码清理任务运行中（DB 自动管理过期）");
             }
         });
     }

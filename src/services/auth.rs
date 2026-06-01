@@ -150,7 +150,7 @@ impl AuthService {
 
         // 验证验证码
         let is_valid = email_verification_manager
-            .verify_code(&email.email, &email.code)
+            .verify_code(db_pool.as_ref(), &email.email, &email.code)
             .await
             .map_err(|e| AppError::InternalServerError(format!("验证验证码失败: {e}")))?;
 

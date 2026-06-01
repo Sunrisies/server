@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use actix_web::{HttpResponse, web};
 use lazy_static::lazy_static;
+use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -86,6 +87,7 @@ pub async fn send_verification_code(
     request: web::Json<SendVerificationCodeRequest>,
     email_service: web::Data<EmailService>,
     email_verification_manager: web::Data<EmailVerificationManager>,
+    db: web::Data<DatabaseConnection>,
 ) -> Result<HttpResponse, AppError> {
     // 校验请求参数
     if let Err(errors) = request.validate() {
@@ -99,7 +101,7 @@ pub async fn send_verification_code(
 
     // 生成并发送验证码
     match email_verification_manager
-        .generate_and_send_code(&email_service, &request.email)
+        .generate_and_send_code(db.as_ref(), &email_service, &request.email)
         .await
     {
         Ok(_) => Ok(HttpResponse::Ok().json(SendVerificationCodeResponse {
