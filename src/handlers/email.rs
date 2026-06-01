@@ -1,13 +1,51 @@
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::Instant;
+
+use actix_web::{HttpResponse, web};
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+use validator::Validate;
+
 use crate::ApiResponse;
 use crate::RouteInfo;
 use crate::config::AppError;
 use crate::dto::user::ValidationErrorJson;
 use crate::route_permission;
 use crate::services::{EmailService, EmailVerificationManager};
-use actix_web::{HttpResponse, web};
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
-use validator::Validate;
+
+lazy_static! {
+    static ref RATE_LIMITER: Mutex<HashMap<String, (u32, Instant)>> = Mutex::new(HashMap::new());
+}
+
+const MAX_CODES_PER_WINDOW: u32 = 3;
+const RATE_WINDOW_SECS: u64 = 300; // 5 分钟
+
+fn check_rate_limit(key: &str) -> Result<(), AppError> {
+    let now = Instant::now();
+    let mut map = RATE_LIMITER
+        .lock()
+        .map_err(|_| AppError::InternalServerError("速率限制器异常".to_string()))?;
+
+    let entry = map.get(key).copied();
+    if let Some((count, window_start)) = entry {
+        if window_start.elapsed().as_secs() < RATE_WINDOW_SECS {
+            if count >= MAX_CODES_PER_WINDOW {
+                return Err(AppError::RateLimited(format!(
+                    "请求过于频繁，请 {} 秒后重试",
+                    RATE_WINDOW_SECS - window_start.elapsed().as_secs()
+                )));
+            }
+            map.insert(key.to_string(), (count + 1, window_start));
+        } else {
+            map.insert(key.to_string(), (1, now));
+        }
+    } else {
+        map.insert(key.to_string(), (1, now));
+    }
+    Ok(())
+}
 
 /// 发送验证码请求
 #[derive(Debug, Validate, Deserialize, ToSchema)]
@@ -55,6 +93,9 @@ pub async fn send_verification_code(
             crate::dto::user::ValidationErrorJson::from_validation_errors(&errors),
         ));
     }
+
+    // 速率限制：每个邮箱 5 分钟内最多 3 次
+    check_rate_limit(&format!("email:{}", request.email))?;
 
     // 生成并发送验证码
     match email_verification_manager
