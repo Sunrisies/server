@@ -1,0 +1,18 @@
+name: auth-security
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  auth-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Registration and least-privilege regression tests
+        run: cargo test --locked auth -- --test-threads=1
+      - name: Secret validation and redaction tests
+        run: cargo test --locked jwt_secret_tests

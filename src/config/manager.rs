@@ -45,10 +45,19 @@ pub struct DatabaseSettings {
     pub set_schema_search_path: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct JwtSettings {
     pub secret: String,
     pub expiry: i64,
+}
+
+impl std::fmt::Debug for JwtSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JwtSettings")
+            .field("secret", &"[REDACTED]")
+            .field("expiry", &self.expiry)
+            .finish()
+    }
 }
 
 // 其他设置结构...
@@ -97,7 +106,8 @@ impl Default for AppConfig {
                     .unwrap_or_else(|_| "public".to_string()),
             },
             jwt: JwtSettings {
-                secret: env::var("JWT_SECRET").unwrap_or_else(|_| "your_secret_key".to_string()),
+                secret: validated_jwt_secret(env::var("JWT_SECRET").ok())
+                    .expect("JWT_SECRET must be set to a strong secret of at least 32 bytes"),
                 expiry: env::var("JWT_EXPIRATION")
                     .unwrap_or_else(|_| "86400".to_string())
                     .parse()
@@ -166,5 +176,45 @@ impl AppConfig {
     // 获取全局配置的静态方法
     pub fn global() -> &'static AppConfig {
         &CONFIG
+    }
+}
+
+fn validated_jwt_secret(secret: Option<String>) -> Result<String, &'static str> {
+    let secret = secret.ok_or("missing JWT_SECRET")?;
+    if secret.trim().len() < 32
+        || secret.contains("your_secret")
+        || secret.contains("your-secret")
+        || secret.contains("change_me")
+        || secret.contains("change-in-production")
+    {
+        return Err("invalid JWT_SECRET");
+    }
+    Ok(secret)
+}
+
+#[cfg(test)]
+mod jwt_secret_tests {
+    use super::{JwtSettings, validated_jwt_secret};
+    #[test]
+    fn debug_output_redacts_secret() {
+        let config = JwtSettings {
+            secret: "never-print-this-secret".into(),
+            expiry: 3600,
+        };
+        let output = format!("{config:?}");
+        assert!(!output.contains("never-print-this-secret"));
+        assert!(output.contains("[REDACTED]"));
+    }
+    #[test]
+    fn rejects_missing_weak_and_placeholder_keys() {
+        for value in [
+            None,
+            Some("your_secret_key".into()),
+            Some(" ".repeat(64)),
+            Some("change_me".repeat(8)),
+        ] {
+            assert!(validated_jwt_secret(value).is_err());
+        }
+        assert!(validated_jwt_secret(Some("0123456789abcdef0123456789abcdef".into())).is_ok());
     }
 }

@@ -57,7 +57,6 @@ pub async fn generate_jwt(
     user: &Model,
 ) -> Result<String, AppError> {
     let claims = TokenClaims::from_user(db_pool, user).await?;
-    log::info!("claims: {:?},{}", claims, &CONFIG.jwt.secret);
     encode(
         &Header::default(),
         &claims,

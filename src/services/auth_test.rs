@@ -8,13 +8,25 @@ mod tests {
     use actix_web::web;
     use chrono::Utc;
     use sea_orm::{
-        ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
-        QueryFilter, QueryOrder, Set,
+        ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+        PaginatorTrait, QueryFilter, QueryOrder, Set,
     };
 
     // 测试数据库连接和初始化
     async fn setup_test_db() -> DatabaseConnection {
-        let db = crate::test_helpers::setup_test_db().await;
+        // 每个测试独立 SQLite 内存库，不读取或清空外部数据库。
+        let mut options = sea_orm::ConnectOptions::new("sqlite::memory:");
+        options.max_connections(1);
+        let db = sea_orm::Database::connect(options).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = sea_orm::Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(users::Entity),
+            schema.create_table_from_entity(roles::Entity),
+            schema.create_table_from_entity(user_roles::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
         create_test_roles(&db).await;
         db
     }
@@ -103,17 +115,36 @@ mod tests {
             "角色应该被标记为主角色"
         );
 
-        // 验证角色是否为超级管理员（当前代码的问题）
+        // 内部注册必须是普通用户，不能提升为管理员
         let role = roles::Entity::find_by_id(user_role.role_id.unwrap())
             .one(db_pool.as_ref())
             .await
             .unwrap()
             .unwrap();
 
-        assert_eq!(
-            role.code, "SUPER_ADMIN",
-            "当前代码中，新用户被错误地分配为超级管理员"
-        );
+        assert_eq!(role.code, "USER", "新用户只能被分配普通用户角色");
+    }
+
+    #[tokio::test]
+    async fn test_register_fails_closed_without_user_role() {
+        let db = setup_test_db().await;
+        roles::Entity::delete_many()
+            .filter(roles::Column::Code.eq("USER"))
+            .exec(&db)
+            .await
+            .unwrap();
+        let result = AuthService::register(
+            web::Data::new(db.clone()),
+            web::Json(RegisterResponse {
+                user_name: "noroleuser".into(),
+                pass_word: "password123".into(),
+            }),
+            web::Data::new(SseNotifier::new()),
+        )
+        .await;
+        assert!(result.is_err());
+        assert_eq!(users::Entity::find().count(&db).await.unwrap(), 0);
+        assert_eq!(user_roles::Entity::find().count(&db).await.unwrap(), 0);
     }
 
     // 测试创建用户 - 用户名太短

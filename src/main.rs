@@ -20,7 +20,8 @@ use web_server::{
 #[actix_web::main]
 async fn main() -> Result<()> {
     init_logger(); // 初始化日志
-    log::info!("app config: {:#?}", CONFIG.jwt);
+    // Force secret validation before starting; never log configuration secrets.
+    let _ = &CONFIG.jwt;
     // 初始化路由注册表 - 这行很重要！
     let _ = init_route_registry();
 
