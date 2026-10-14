@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use crate::SseNotifier;
     use crate::dto::user::RegisterResponse;
     use crate::models::{roles, user_roles, users};
@@ -13,7 +13,7 @@ mod tests {
     };
 
     // 测试数据库连接和初始化
-    async fn setup_test_db() -> DatabaseConnection {
+    pub(crate) async fn setup_test_db() -> DatabaseConnection {
         // 每个测试独立 SQLite 内存库，不读取或清空外部数据库。
         let mut options = sea_orm::ConnectOptions::new("sqlite::memory:");
         options.max_connections(1);

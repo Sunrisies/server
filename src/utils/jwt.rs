@@ -35,19 +35,24 @@ impl TokenClaims {
         db_pool: &sea_orm::DatabaseConnection,
         user: &Model,
     ) -> Result<i32, AppError> {
-        let roles = user_roles::Entity::find()
+        let assignments = user_roles::Entity::find()
             .filter(user_roles::Column::UserId.eq(user.id))
-            .find_with_related(roles::Entity)
             .all(db_pool)
             .await
-            .map_err(|e| AppError::DatabaseError(format!("Failed to get user roles: {}", e)))?;
-
-        // 生成角色哈希值
-        let role_ids: Vec<i32> = roles
+            .map_err(|_| AppError::DatabaseError("用户角色查询失败".into()))?;
+        let ids: Vec<i32> = assignments
             .iter()
-            .flat_map(|(_, related_roles)| related_roles.iter().map(|role| role.id))
+            .filter_map(|assignment| assignment.role_id)
             .collect();
-        Ok(role_ids[0])
+        let roles = roles::Entity::find()
+            .filter(roles::Column::Id.is_in(ids))
+            .all(db_pool)
+            .await
+            .map_err(|_| AppError::DatabaseError("用户角色查询失败".into()))?;
+        roles
+            .first()
+            .map(|role| role.id)
+            .ok_or_else(|| AppError::Forbidden("用户未分配角色".into()))
     }
 }
 
@@ -89,4 +94,29 @@ pub fn decode_jwt(token: &str) -> Result<TokenClaims, AppError> {
         }
     })
     .map(|data| data.claims)
+}
+
+#[cfg(test)]
+mod auth_role_tests {
+    use super::*;
+    #[actix_web::test]
+    async fn auth_user_without_roles_returns_error_without_panicking() {
+        let db = crate::services::auth_test::tests::setup_test_db().await;
+        let user = crate::services::auth::AuthService::register(
+            actix_web::web::Data::new(db.clone()),
+            actix_web::web::Json(crate::dto::user::RegisterResponse {
+                user_name: "emptyroles".into(),
+                pass_word: "password123".into(),
+            }),
+            actix_web::web::Data::new(crate::SseNotifier::new()),
+        )
+        .await
+        .unwrap();
+        user_roles::Entity::delete_many()
+            .filter(user_roles::Column::UserId.eq(user.id))
+            .exec(&db)
+            .await
+            .unwrap();
+        assert!(TokenClaims::get_permission_codes(&db, &user).await.is_err());
+    }
 }

@@ -87,7 +87,7 @@ async fn main() -> Result<()> {
                 false
             });
         App::new()
-            .wrap(Auth)
+            .wrap(Auth::new(db_pool.clone()))
             .app_data(web::JsonConfig::default().error_handler(|err, _| json_err_map(err)))
             .app_data(db_pool.clone())
             .app_data(notifier.clone())

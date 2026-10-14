@@ -18,15 +18,18 @@ use crate::utils::jwt::TokenClaims;
 use crate::{ApiResponse, HttpResult};
 
 /// 从请求中获取当前用户ID。如果未登录（游客访问），返回 None。
-fn current_user_id(req: &HttpRequest) -> Option<i32> {
-    if let Some(claims) = req.extensions().get::<TokenClaims>() {
-        // 通过 user_uuid 查询用户（简化处理：单人博客作者固定为 id=1）
-        // 实际项目中应通过 db 查询 uuid 对应的 id
-        log::info!("当前用户: {} ({})", claims.user_name, claims.user_uuid);
-        Some(1) // TODO: 从数据库通过 uuid 查询真实 user_id
-    } else {
-        None
-    }
+async fn current_user_id(req: &HttpRequest, db: &DatabaseConnection) -> Result<i32, AppError> {
+    let uuid = req
+        .extensions()
+        .get::<TokenClaims>()
+        .map(|claims| claims.user_uuid.clone())
+        .ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
+    crate::models::users::Entity::find_by_uuid(&uuid)
+        .one(db)
+        .await
+        .map_err(|_| AppError::DatabaseError("用户查询失败".into()))?
+        .map(|user| user.id)
+        .ok_or_else(|| AppError::Unauthorized("用户不存在".into()))
 }
 use sea_orm::RelationTrait;
 use sea_orm::{
@@ -67,9 +70,13 @@ use validator::Validate;
     ),
 )]
 pub async fn get_posts_all_handler(
+    req: HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
     query: web::Query<PaginationQuery>,
 ) -> HttpResult {
+    query
+        .validate()
+        .map_err(|e| AppError::ValidationError(ValidationErrorJson::from_validation_errors(&e)))?;
     let PaginationQuery {
         page,
         limit,
@@ -79,6 +86,13 @@ pub async fn get_posts_all_handler(
     // 1. 构建基础查询（文章 + 分类）
     let mut query_builder = posts::Entity::find().find_also_related(categories::Entity);
 
+    if req
+        .extensions()
+        .get::<crate::middleware::auth::AdminAccess>()
+        .is_none()
+    {
+        query_builder = query_builder.filter(posts::Column::Status.eq(1));
+    }
     // 新增：如果传入了分类ID，则添加过滤条件
     if let Some(cat_id) = category {
         // 假设 category 是 i32 类型（分类ID），且 posts 表有 category_id 字段
@@ -135,8 +149,7 @@ pub async fn get_posts_all_handler(
             .filter(post_tags::Column::PostId.is_in(post_ids.clone()))
             .find_also_related(tags::Entity)
             .all(db_pool.as_ref())
-            .await
-            .unwrap_or_default();
+            .await?;
 
         let mut map = std::collections::HashMap::new();
         for (post_tag, tag_option) in tag_relations {
@@ -151,6 +164,17 @@ pub async fn get_posts_all_handler(
         }
         map
     };
+    let author_ids: Vec<i32> = posts_with_categories
+        .iter()
+        .map(|(post, _)| post.author_id)
+        .collect();
+    let authors: std::collections::HashMap<i32, String> = crate::models::users::Entity::find()
+        .filter(crate::models::users::Column::Id.is_in(author_ids))
+        .all(db_pool.get_ref())
+        .await?
+        .into_iter()
+        .map(|user| (user.id, user.user_name))
+        .collect();
     // 4. 构建最终的响应数据
     let data: Vec<PostResponse> = posts_with_categories
         .into_iter()
@@ -165,7 +189,7 @@ pub async fn get_posts_all_handler(
             let tags = post_tags_map.get(&post.id).cloned().unwrap_or_default();
 
             // 构建作者信息（这里需要根据您的用户表结构调整）
-            let author = "朝阳".to_string(); // 您需要从用户表查询真实作者名
+            let author = authors.get(&post.author_id).cloned().unwrap_or_default();
             // 构建响应对象
             PostResponse {
                 id: post.id,
@@ -213,6 +237,7 @@ pub async fn get_timeline_handler(db_pool: web::Data<DatabaseConnection>) -> Htt
         count: i64,
     }
     let timeline_data = posts::Entity::find()
+        .filter(posts::Column::Status.eq(1))
         .select_only()
         .column_as(
             Expr::col(posts::Column::CreatedAt).cast_as(sea_orm::sea_query::Alias::new("date")),
@@ -223,8 +248,7 @@ pub async fn get_timeline_handler(db_pool: web::Data<DatabaseConnection>) -> Htt
         .order_by_desc(Expr::col(posts::Column::CreatedAt).cast_as(Alias::new("date")))
         .into_model::<TimelineCount>()
         .all(db_pool.as_ref())
-        .await
-        .unwrap_or_default();
+        .await?;
 
     let resp = timeline_data
         .into_iter()
@@ -251,13 +275,22 @@ pub async fn get_timeline_handler(db_pool: web::Data<DatabaseConnection>) -> Htt
     ),
 )]
 pub async fn get_posts_handler(
+    req: HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
     page: web::Path<String>,
 ) -> HttpResult {
     let uuid = page.into_inner();
 
     // 1. 查询文章和分类（通过 UUID）
-    let post_with_category = posts::Entity::find_by_uuid(&uuid)
+    let mut query = posts::Entity::find_by_uuid(&uuid);
+    if req
+        .extensions()
+        .get::<crate::middleware::auth::AdminAccess>()
+        .is_none()
+    {
+        query = query.filter(posts::Column::Status.eq(1));
+    }
+    let post_with_category = query
         .find_also_related(categories::Entity)
         .one(db_pool.as_ref())
         .await
@@ -279,8 +312,7 @@ pub async fn get_posts_handler(
         .filter(post_tags::Column::PostId.eq(post.id))
         .find_also_related(tags::Entity)
         .all(db_pool.as_ref())
-        .await
-        .unwrap_or_default();
+        .await?;
 
     let tags: Vec<TagResponse> = tag_relations
         .into_iter()
@@ -297,13 +329,25 @@ pub async fn get_posts_handler(
         name: category.name,
     });
 
-    let author = "朝阳".to_string(); // 这里需要从用户表查询真实作者名
+    let author = crate::models::users::Entity::find_by_id(post.author_id)
+        .one(db_pool.get_ref())
+        .await?
+        .map(|user| user.user_name)
+        .unwrap_or_default();
 
     let response = PostListResponse {
         id: post.id,
         uuid: post.uuid,
         title: post.title,
-        content: post.markdowncontent,
+        content: post.markdowncontent.clone(),
+        htmlcontent: req
+            .extensions()
+            .get::<crate::middleware::auth::AdminAccess>()
+            .map(|_| post.content),
+        markdowncontent: req
+            .extensions()
+            .get::<crate::middleware::auth::AdminAccess>()
+            .map(|_| post.markdowncontent),
         cover: post.cover_image.unwrap_or_default(),
         author,
         publish_time: post.published_at,
@@ -352,6 +396,7 @@ pub async fn get_prev_next_handler(
     let uuid = page.into_inner();
     // 查询当前文章，使用更简洁的错误处理
     let post = posts::Entity::find_by_uuid(&uuid)
+        .filter(posts::Column::Status.eq(1))
         .one(db_pool.as_ref())
         .await?
         .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
@@ -360,11 +405,13 @@ pub async fn get_prev_next_handler(
     let (prev, next) = try_join!(
         // 查询上一篇（创建时间更早的）
         posts::Entity::find()
+            .filter(posts::Column::Status.eq(1))
             .filter(posts::Column::CreatedAt.lt(post.created_at))
             .order_by(posts::Column::CreatedAt, Order::Desc)
             .one(db_pool.as_ref()),
         // 查询下一篇（创建时间更晚的）
         posts::Entity::find()
+            .filter(posts::Column::Status.eq(1))
             .filter(posts::Column::CreatedAt.gt(post.created_at))
             .order_by(posts::Column::CreatedAt, Order::Asc)
             .one(db_pool.as_ref())
@@ -373,7 +420,6 @@ pub async fn get_prev_next_handler(
         log::error!("数据库操作失败: {e}");
         AppError::DatabaseError("服务器异常，请联系管理员".to_string())
     })?;
-    log::info!("prev: {prev:?}, next: {next:?}");
     Ok(ApiResponse::success(
         PrevNextResult {
             prev_article: prev.map(to_response),
@@ -404,7 +450,7 @@ pub async fn create_post_handler(
     post_data: web::Json<CreatePostRequest>,
 ) -> HttpResult {
     log::info!("create_post_handler: {post_data:?}");
-    let user_id = current_user_id(&req).unwrap_or(1);
+    let user_id = current_user_id(&req, db_pool.get_ref()).await?;
     // 验证输入
     if let Err(validation_errors) = post_data.validate() {
         let msg = ValidationErrorJson::from_validation_errors(&validation_errors);
@@ -448,7 +494,7 @@ pub async fn update_post_handler(
     path: web::Path<String>,
     post_data: web::Json<UpdatePostRequest>,
 ) -> HttpResult {
-    let user_id = current_user_id(&req).unwrap_or(1);
+    let user_id = current_user_id(&req, db_pool.get_ref()).await?;
     // 验证输入
     if let Err(validation_errors) = post_data.validate() {
         let msg = ValidationErrorJson::from_validation_errors(&validation_errors);
@@ -492,7 +538,7 @@ pub async fn delete_post_handler(
     db_pool: web::Data<DatabaseConnection>,
     path: web::Path<String>,
 ) -> HttpResult {
-    let user_id = current_user_id(&req).unwrap_or(1);
+    let user_id = current_user_id(&req, db_pool.get_ref()).await?;
     let uuid = path.into_inner();
 
     // 调用服务层删除文章
@@ -543,5 +589,193 @@ pub async fn view_post_handler(
             Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse, "成功").to_http_response())
         }
         Err(e) => Ok(ApiResponse::from(e).to_http_response()),
+    }
+}
+
+#[cfg(test)]
+mod auth_author_tests {
+    use super::*;
+    use actix_web::test;
+    #[actix_web::test]
+    async fn author_id_is_resolved_from_uuid_instead_of_constant() {
+        let db = crate::services::auth_test::tests::setup_test_db().await;
+        let notifier = web::Data::new(crate::SseNotifier::new());
+        let mut last = None;
+        for name in ["firstuser", "seconduser"] {
+            last = Some(
+                crate::services::auth::AuthService::register(
+                    web::Data::new(db.clone()),
+                    web::Json(crate::dto::user::RegisterResponse {
+                        user_name: name.into(),
+                        pass_word: "password123".into(),
+                    }),
+                    notifier.clone(),
+                )
+                .await
+                .unwrap(),
+            );
+        }
+        let user = last.unwrap();
+        let req = test::TestRequest::default().to_http_request();
+        req.extensions_mut().insert(TokenClaims {
+            user_uuid: user.uuid,
+            user_name: user.user_name,
+            exp: i64::MAX,
+            role_id: 1,
+        });
+        assert_ne!(user.id, 1);
+        assert_eq!(current_user_id(&req, &db).await.unwrap(), user.id);
+        assert!(
+            current_user_id(&test::TestRequest::default().to_http_request(), &db)
+                .await
+                .is_err()
+        );
+    }
+    #[actix_web::test]
+    async fn auth_public_posts_hide_drafts_and_admin_detail_preserves_sources() {
+        use sea_orm::{ActiveModelTrait, ConnectionTrait, Schema, Set};
+        let db = crate::services::auth_test::tests::setup_test_db().await;
+        let schema = Schema::new(db.get_database_backend());
+        for table in [
+            schema.create_table_from_entity(categories::Entity),
+            schema.create_table_from_entity(posts::Entity),
+            schema.create_table_from_entity(tags::Entity),
+            schema.create_table_from_entity(post_tags::Entity),
+        ] {
+            db.execute(db.get_database_backend().build(&table))
+                .await
+                .unwrap();
+        }
+        let now = chrono::Utc::now();
+        let category = categories::ActiveModel {
+            name: Set("Test".into()),
+            slug: Set("test".into()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        let user = crate::services::auth::AuthService::register(
+            web::Data::new(db.clone()),
+            web::Json(crate::dto::user::RegisterResponse {
+                user_name: "authorname".into(),
+                pass_word: "password123".into(),
+            }),
+            web::Data::new(crate::SseNotifier::new()),
+        )
+        .await
+        .unwrap();
+        for (uuid, status) in [("published", 1), ("draft", 0), ("hidden", 2)] {
+            posts::ActiveModel {
+                uuid: Set(uuid.into()),
+                author_id: Set(user.id),
+                category_id: Set(category.id),
+                title: Set(uuid.into()),
+                content: Set("<h1>HTML</h1>".into()),
+                markdowncontent: Set("# Markdown".into()),
+                status: Set(status),
+                featured: Set(false),
+                view_count: Set(0),
+                size: Set(10),
+                created_at: Set(now + chrono::Duration::seconds(i64::from(status))),
+                updated_at: Set(now),
+                published_at: Set(now),
+                ..Default::default()
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+        let app = actix_web::test::init_service(
+            actix_web::App::new()
+                .app_data(web::Data::new(db.clone()))
+                .configure(crate::routes::posts::config_routes),
+        )
+        .await;
+        let response = actix_web::test::call_service(
+            &app,
+            actix_web::test::TestRequest::get()
+                .uri("/v1/posts?page=1&limit=100")
+                .to_request(),
+        )
+        .await;
+        let body: serde_json::Value = actix_web::test::read_body_json(response).await;
+        assert_eq!(body["data"]["pagination"]["total"], 1);
+        assert_eq!(body["data"]["data"][0]["author"], "authorname");
+        let invalid = actix_web::test::call_service(
+            &app,
+            actix_web::test::TestRequest::get()
+                .uri("/v1/posts?page=0&limit=10")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(invalid.status(), 422);
+        let neighbors = actix_web::test::call_service(
+            &app,
+            actix_web::test::TestRequest::get()
+                .uri("/v1/posts/published/prevnext")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(neighbors.status(), 200);
+        let neighbors: serde_json::Value = actix_web::test::read_body_json(neighbors).await;
+        assert!(neighbors["data"]["prev"].is_null());
+        assert!(neighbors["data"]["next"].is_null());
+        let draft = actix_web::test::call_service(
+            &app,
+            actix_web::test::TestRequest::get()
+                .uri("/v1/posts/draft")
+                .to_request(),
+        )
+        .await;
+        assert_eq!(draft.status(), 404);
+        let req = actix_web::test::TestRequest::default().to_http_request();
+        req.extensions_mut()
+            .insert(crate::middleware::auth::AdminAccess);
+        let response = get_posts_handler(
+            req,
+            web::Data::new(db.clone()),
+            web::Path::from("draft".to_string()),
+        )
+        .await
+        .unwrap();
+        let bytes = actix_web::body::to_bytes(response.into_body())
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["data"]["htmlcontent"], "<h1>HTML</h1>");
+        assert_eq!(body["data"]["markdowncontent"], "# Markdown");
+        assert!(
+            crate::handlers::category::categories_routes::get_categories_all(&db, 1, 0)
+                .await
+                .is_err()
+        );
+        let update = serde_json::from_value(serde_json::json!({"title":"changed"})).unwrap();
+        assert!(matches!(
+            crate::services::posts::PostService::update_post(&db, user.id + 1, "published", update)
+                .await,
+            Err(AppError::Forbidden(_))
+        ));
+        assert!(matches!(
+            crate::services::posts::PostService::delete_post(&db, user.id + 1, "published").await,
+            Err(AppError::Forbidden(_))
+        ));
+        let req = actix_web::test::TestRequest::default().to_http_request();
+        let response = get_posts_handler(
+            req,
+            web::Data::new(db),
+            web::Path::from("published".to_string()),
+        )
+        .await
+        .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(
+            &actix_web::body::to_bytes(response.into_body())
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(body["data"].get("htmlcontent").is_none());
     }
 }

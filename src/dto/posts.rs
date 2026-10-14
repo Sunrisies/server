@@ -25,6 +25,10 @@ pub struct PostListResponse {
     pub cover: String,
     pub author: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub htmlcontent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub markdowncontent: Option<String>,
     #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub publish_time: chrono::DateTime<chrono::Utc>,

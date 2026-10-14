@@ -319,6 +319,9 @@ fn generate_list_code(
     quote! {
         #doc
         pub async fn #get_fn(db_pool: &DatabaseConnection, page: u64, limit: u64) -> Result<HttpResponse, #error_type> {
+            if page == 0 || !(1..=100).contains(&limit) {
+                return Err(#error_type::BadRequest("分页参数无效：page>=1，limit为1到100".into()));
+            }
             let paginator = #entity::Entity::find().paginate(db_pool, limit);
             let total = paginator.num_items().await
                 .map_err(|e| { eprintln!("查询总数失败: {}", e); #error_type::DatabaseConnectionError("获取失败".into()) })?;
