@@ -8,7 +8,7 @@ pub use ws::echo;
 pub mod sse;
 pub use sse::sse_stream;
 #[cfg(test)]
-mod auth_test;
+pub(crate) mod auth_test;
 pub mod email;
 pub mod posts;
 #[cfg(test)]

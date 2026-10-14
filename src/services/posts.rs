@@ -166,7 +166,7 @@ impl PostService {
 
         // 检查权限（只有作者可以编辑自己的文章）
         if post.author_id != user_id {
-            return Err(AppError::Unauthorized("没有权限编辑此文章".to_string()));
+            return Err(AppError::Forbidden("没有权限编辑此文章".to_string()));
         }
 
         // 开启事务
@@ -331,7 +331,7 @@ impl PostService {
 
         // 检查权限（只有作者可以删除自己的文章）
         if post.author_id != user_id {
-            return Err(AppError::Unauthorized("没有权限删除此文章".to_string()));
+            return Err(AppError::Forbidden("没有权限删除此文章".to_string()));
         }
 
         // 开启事务
@@ -375,6 +375,7 @@ impl PostService {
         ip: &str,
     ) -> Result<(), AppError> {
         let post = posts::Entity::find_by_uuid(uuid)
+            .filter(posts::Column::Status.eq(1))
             .one(db)
             .await
             .map_err(|e| {

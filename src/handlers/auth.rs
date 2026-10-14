@@ -65,7 +65,7 @@ pub async fn register(
     summary = "登录",
     path = "/api/v1/auth/login",
     tag="鉴权模块",
-    description = "支持密码登录、邮箱验证码登录、手机号登录、第三方登录",
+    description = "支持密码与邮箱验证码登录；手机号、第三方登录暂未开放",
     request_body(
         content = LoginRequest,
         examples(
@@ -127,4 +127,24 @@ pub async fn login(
         LoginRequest::Phone(p) => AuthService::login_by_phone(db_pool, p),
         LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o),
     }
+}
+
+/// 注销当前 JWT，数据库撤销记录在重启和多实例间保持有效。
+pub async fn logout(req: actix_web::HttpRequest, db: web::Data<DatabaseConnection>) -> HttpResult {
+    if let Some(cookie) = req.cookie("access_token") {
+        if let Ok(claims) = crate::utils::jwt::decode_jwt(cookie.value()) {
+            crate::utils::token_revocation::revoke(db.get_ref(), cookie.value(), claims.exp)
+                .await?;
+        }
+    }
+    let cookie = actix_web::cookie::Cookie::build("access_token", "")
+        .path("/")
+        .http_only(true)
+        .secure(true)
+        .same_site(actix_web::cookie::SameSite::Strict)
+        .max_age(actix_web::cookie::time::Duration::ZERO)
+        .finish();
+    Ok(actix_web::HttpResponse::Ok()
+        .cookie(cookie)
+        .json(serde_json::json!({"code":200,"data":{"revoked":true}})))
 }

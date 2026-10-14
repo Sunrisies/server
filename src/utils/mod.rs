@@ -11,3 +11,5 @@ pub mod file_size;
 pub mod jwt;
 pub mod perm_cache;
 pub mod websocket;
+
+pub mod token_revocation;

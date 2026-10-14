@@ -7,6 +7,7 @@ use actix_web::web;
 pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/v1/posts")
+            .route("/{uuid}/prevnext", web::get().to(get_prev_next_handler))
             .route("/prevNext/{uuid:.*}", web::get().to(get_prev_next_handler))
             .route("/uploadTime", web::get().to(get_timeline_handler))
             .route("/{uuid}/view", web::post().to(view_post_handler))

@@ -55,6 +55,7 @@ inventory = "0.3.21"
 ureq = "2"
 hmac = "0.12"
 sha1 = "0.10"
+sha2 = "0.10"
 actix-rt = "2.11.0"
 actix-multipart = "0.7.2"
 image = { version = "0.25.8", default-features = false, features = [

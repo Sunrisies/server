@@ -41,6 +41,7 @@ impl Related<super::posts::Entity> for Entity {
 impl ActiveModelBehavior for ActiveModel {}
 #[derive(Debug, FromQueryResult)]
 pub struct PostWithCategory {
+    pub author_id: i32,
     pub id: i32,
     pub uuid: String,
     pub title: String,

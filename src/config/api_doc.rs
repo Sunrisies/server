@@ -49,7 +49,6 @@ use utoipa::OpenApi;
         ),
     ),
     paths(
-        auth::register,
         auth::login,
         // 用户
         get_users_handler,

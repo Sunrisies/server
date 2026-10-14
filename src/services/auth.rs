@@ -54,13 +54,13 @@ impl AuthService {
             AppError::DatabaseError(String::new())
         })?;
 
-        // —— 3. 查 SUPER_ADMIN 角色 id（单人博客，注册即管理员） ——
+        // —— 3. 内部创建用户也只授予普通用户角色，缺失时回滚 ——
         let viewer_role = roles::Entity::find()
-            .filter(roles::Column::Code.eq("SUPER_ADMIN"))
+            .filter(roles::Column::Code.eq("USER"))
             .one(&txn)
             .await
-            .map_err(|_| AppError::DatabaseError("SUPER_ADMIN role not found".into()))?
-            .ok_or_else(|| AppError::DatabaseError("SUPER_ADMIN role not found".into()))?;
+            .map_err(|_| AppError::DatabaseError("USER role not found".into()))?
+            .ok_or_else(|| AppError::DatabaseError("USER role not found".into()))?;
 
         // —— 4. 绑角色（is_primary = true） ——
         let user_role_am = user_roles::ActiveModel {
@@ -112,13 +112,14 @@ impl AuthService {
             Ok(true) => {
                 // 登录成功
                 let token = generate_jwt(&db_pool, &user).await?;
-                log::info!("login_by_pwd token: {token:?}");
                 // 2. 构造 Cookie
                 let cookie = Cookie::build("access_token", token)
                     .http_only(true) // 防 XSS
                     .same_site(SameSite::Strict) // 防 CSRF
                     .secure(true) // 生产必须 true，本地可 false
-                    .max_age(ActixDuration::hours(1))
+                    .max_age(ActixDuration::seconds(
+                        crate::config::manager::CONFIG.jwt.expiry,
+                    ))
                     .path("/") // 全局可用
                     .finish();
                 Ok(HttpResponse::Ok()
@@ -146,8 +147,6 @@ impl AuthService {
         // email_service: web::Data<EmailService>,
         email_verification_manager: web::Data<EmailVerificationManager>,
     ) -> HttpResult {
-        log::info!("login_by_email{email:?}");
-
         // 验证验证码
         let is_valid = email_verification_manager
             .verify_code(db_pool.as_ref(), &email.email, &email.code)
@@ -176,14 +175,14 @@ impl AuthService {
         // 生成JWT令牌
         let token = generate_jwt(&db_pool, &user).await?;
 
-        log::info!("login_by_email token: {token:?}");
-
         // 构造Cookie
         let cookie = Cookie::build("access_token", token)
             .http_only(true) // 防XSS
             .same_site(SameSite::Strict) // 防CSRF
             .secure(true) // 生产必须true，本地可false
-            .max_age(ActixDuration::hours(1))
+            .max_age(ActixDuration::seconds(
+                crate::config::manager::CONFIG.jwt.expiry,
+            ))
             .path("/") // 全局可用
             .finish();
 
@@ -197,18 +196,14 @@ impl AuthService {
     }
     pub fn login_by_phone(
         _db_pool: web::Data<DatabaseConnection>,
-        phone: PhoneLogin,
+        _phone: PhoneLogin,
     ) -> HttpResult {
-        log::info!("login_by_phone{phone:?}");
-
-        Ok(ApiResponse::success("user", "手机号").to_http_response())
+        Err(AppError::NotImplemented("手机号登录暂未开放".into()))
     }
     pub fn login_by_oauth(
         _db_pool: web::Data<DatabaseConnection>,
-        oauth: OAuthLogin,
+        _oauth: OAuthLogin,
     ) -> HttpResult {
-        log::info!("login_by_oauth{:?}", oauth);
-
-        Ok(ApiResponse::success("user", "第三方").to_http_response())
+        Err(AppError::NotImplemented("第三方登录暂未开放".into()))
     }
 }

@@ -20,7 +20,8 @@ use web_server::{
 #[actix_web::main]
 async fn main() -> Result<()> {
     init_logger(); // 初始化日志
-    log::info!("app config: {:#?}", CONFIG.jwt);
+    // Force secret validation before starting; never log configuration secrets.
+    let _ = &CONFIG.jwt;
     // 初始化路由注册表 - 这行很重要！
     let _ = init_route_registry();
 
@@ -28,6 +29,7 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to connect to database")?;
     // 将db添加到应用数据中
+    web_server::utils::token_revocation::initialize(&db).await?;
     let db_pool = web::Data::new(db);
     load_perm_cache(&db_pool.clone()).await.unwrap();
     // 添加sse
@@ -86,7 +88,7 @@ async fn main() -> Result<()> {
                 false
             });
         App::new()
-            .wrap(Auth)
+            .wrap(Auth::new(db_pool.clone()))
             .app_data(web::JsonConfig::default().error_handler(|err, _| json_err_map(err)))
             .app_data(db_pool.clone())
             .app_data(notifier.clone())
