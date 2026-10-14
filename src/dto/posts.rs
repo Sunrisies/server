@@ -78,7 +78,7 @@ pub struct CreatePostRequest {
     #[validate(length(max = 500, message = "摘要长度不能超过500个字符"))]
     pub summary: Option<String>,
 
-    #[validate(length(min = 1, message = "内容不能为空"))]
+    #[serde(default)]
     pub content: String,
 
     #[validate(length(min = 1, message = "Markdown内容不能为空"))]
@@ -91,6 +91,7 @@ pub struct CreatePostRequest {
     #[validate(length(min = 1, message = "至少需要选择一个标签"))]
     pub tag_ids: Vec<i32>,
 
+    #[validate(range(min = 0, max = 2))]
     pub status: i16, // 0 草稿 1 发布 2 下线
 
     pub featured: bool,
@@ -115,6 +116,7 @@ pub struct UpdatePostRequest {
 
     pub tag_ids: Option<Vec<i32>>,
 
+    #[validate(range(min = 0, max = 2))]
     pub status: Option<i16>, // 0 草稿 1 发布 2 下线
 
     pub featured: Option<bool>,
@@ -139,4 +141,20 @@ pub struct PrevNextResult {
     pub prev_article: Option<PrevNextResponse>,
     #[serde(rename = "nextArticle")]
     pub next_article: Option<PrevNextResponse>,
+}
+
+#[cfg(test)]
+mod auth_post_input_tests {
+    use super::*;
+    #[test]
+    fn auth_post_creation_accepts_optional_html_and_validates_status() {
+        let mut post: CreatePostRequest = serde_json::from_value(serde_json::json!({"title":"Valid", "markdowncontent":"# Markdown", "category_id":1, "tag_ids":[1], "status":1, "featured":false})).unwrap();
+        assert!(post.content.is_empty());
+        assert!(post.validate().is_ok());
+        post.status = 4;
+        assert!(post.validate().is_err());
+        let update: UpdatePostRequest =
+            serde_json::from_value(serde_json::json!({"status":-1})).unwrap();
+        assert!(update.validate().is_err());
+    }
 }

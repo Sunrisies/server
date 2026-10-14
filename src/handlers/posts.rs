@@ -622,6 +622,7 @@ mod auth_author_tests {
             user_name: user.user_name,
             exp: i64::MAX,
             role_id: 1,
+            jti: None,
         });
         assert_ne!(user.id, 1);
         assert_eq!(current_user_id(&req, &db).await.unwrap(), user.id);

@@ -128,3 +128,23 @@ pub async fn login(
         LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o),
     }
 }
+
+/// 注销当前 JWT，数据库撤销记录在重启和多实例间保持有效。
+pub async fn logout(req: actix_web::HttpRequest, db: web::Data<DatabaseConnection>) -> HttpResult {
+    if let Some(cookie) = req.cookie("access_token") {
+        if let Ok(claims) = crate::utils::jwt::decode_jwt(cookie.value()) {
+            crate::utils::token_revocation::revoke(db.get_ref(), cookie.value(), claims.exp)
+                .await?;
+        }
+    }
+    let cookie = actix_web::cookie::Cookie::build("access_token", "")
+        .path("/")
+        .http_only(true)
+        .secure(true)
+        .same_site(actix_web::cookie::SameSite::Strict)
+        .max_age(actix_web::cookie::time::Duration::ZERO)
+        .finish();
+    Ok(actix_web::HttpResponse::Ok()
+        .cookie(cookie)
+        .json(serde_json::json!({"code":200,"data":{"revoked":true}})))
+}

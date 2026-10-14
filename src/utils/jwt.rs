@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 pub struct TokenClaims {
     pub user_uuid: String,
     pub user_name: String,
-    pub exp: i64,     // u64 更安全
+    pub exp: i64, // u64 更安全
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jti: Option<String>,
     pub role_id: i32, //
 }
 
@@ -24,6 +26,7 @@ impl TokenClaims {
         let role_id = Self::get_permission_codes(db_pool, user).await?;
 
         Ok(TokenClaims {
+            jti: Some(uuid::Uuid::new_v4().to_string()),
             user_uuid: user.uuid.clone(),
             user_name: user.user_name.clone(),
             exp,
@@ -75,7 +78,8 @@ pub async fn generate_jwt(
 
 /// 解析 JWT
 pub fn decode_jwt(token: &str) -> Result<TokenClaims, AppError> {
-    let validation = Validation::new(Algorithm::HS256);
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.leeway = 0;
     decode::<TokenClaims>(
         token,
         &DecodingKey::from_secret(CONFIG.jwt.secret.as_bytes()),

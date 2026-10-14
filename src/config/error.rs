@@ -158,6 +158,8 @@ impl fmt::Display for AppError {
     }
 }
 
+impl std::error::Error for AppError {}
+
 // 实现 ResponseError trait 用于 Actix-web 错误处理
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {

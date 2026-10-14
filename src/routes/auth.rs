@@ -1,4 +1,4 @@
-use crate::handlers::auth::login;
+use crate::handlers::auth::{login, logout};
 use actix_web::{HttpResponse, web};
 
 async fn registration_disabled() -> HttpResponse {
@@ -11,7 +11,8 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/v1/auth")
             .route("/register", web::post().to(registration_disabled))
-            .route("/login", web::post().to(login)),
+            .route("/login", web::post().to(login))
+            .route("/logout", web::post().to(logout)),
     );
 }
 

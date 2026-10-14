@@ -117,7 +117,9 @@ impl AuthService {
                     .http_only(true) // 防 XSS
                     .same_site(SameSite::Strict) // 防 CSRF
                     .secure(true) // 生产必须 true，本地可 false
-                    .max_age(ActixDuration::hours(1))
+                    .max_age(ActixDuration::seconds(
+                        crate::config::manager::CONFIG.jwt.expiry,
+                    ))
                     .path("/") // 全局可用
                     .finish();
                 Ok(HttpResponse::Ok()
@@ -178,7 +180,9 @@ impl AuthService {
             .http_only(true) // 防XSS
             .same_site(SameSite::Strict) // 防CSRF
             .secure(true) // 生产必须true，本地可false
-            .max_age(ActixDuration::hours(1))
+            .max_age(ActixDuration::seconds(
+                crate::config::manager::CONFIG.jwt.expiry,
+            ))
             .path("/") // 全局可用
             .finish();
 

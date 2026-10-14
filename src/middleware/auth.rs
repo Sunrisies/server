@@ -84,6 +84,7 @@ fn public_request(path: &str, method: &Method) -> bool {
     if [
         "/api/v1/auth/login",
         "/api/v1/auth/register",
+        "/api/v1/auth/logout",
         "/api/v1/email/send-verification-code",
     ]
     .contains(&path)
@@ -132,10 +133,20 @@ async fn authorize(
             Err(AppError::Unauthorized("请先登录".into()).into())
         };
     };
+    let db = db.ok_or_else(|| AppError::InternalServerError("鉴权服务暂时不可用".into()))?;
+    let token = req
+        .cookie("access_token")
+        .ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
+    if crate::utils::token_revocation::is_revoked(db.get_ref(), token.value()).await? {
+        return if public {
+            Ok(())
+        } else {
+            Err(AppError::Unauthorized("会话已注销".into()).into())
+        };
+    }
     let needs_admin = !public;
     // Published/draft visibility on content reads depends on current DB roles.
     if needs_admin || within(req.path(), "/api/v1/posts") {
-        let db = db.ok_or_else(|| AppError::InternalServerError("鉴权服务暂时不可用".into()))?;
         let user = crate::models::users::Entity::find_by_uuid(&claims.user_uuid)
             .one(db.get_ref())
             .await
@@ -257,6 +268,7 @@ mod tests {
             user_name: user.user_name,
             exp: chrono::Utc::now().timestamp() + 3600,
             role_id: 999,
+            jti: None,
         };
         let token = jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),

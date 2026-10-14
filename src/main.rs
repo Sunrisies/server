@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to connect to database")?;
     // 将db添加到应用数据中
+    web_server::utils::token_revocation::initialize(&db).await?;
     let db_pool = web::Data::new(db);
     load_perm_cache(&db_pool.clone()).await.unwrap();
     // 添加sse

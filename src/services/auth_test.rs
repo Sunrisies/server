@@ -27,6 +27,9 @@ pub(crate) mod tests {
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
+        crate::utils::token_revocation::initialize(&db)
+            .await
+            .unwrap();
         create_test_roles(&db).await;
         db
     }
