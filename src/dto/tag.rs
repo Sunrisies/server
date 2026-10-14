@@ -8,15 +8,20 @@ use crate::models::tags;
 /// 创建标签的请求体
 #[derive(Deserialize, ToSchema, Debug, Validate)]
 pub struct CreateTagRequest {
-    #[validate(length(min = 1, message = "名称不能为空"))]
+    #[validate(length(min = 1, max = 100, message = "标签名称需为1到100个字符"))]
     #[schema(example = "Rust")]
     pub name: String,
 }
 
-// 使用宏重写你的代码
-impl_from_request!(CreateTagRequest => tags::ActiveModel {
-    name
-});
+impl From<CreateTagRequest> for tags::ActiveModel {
+    fn from(req: CreateTagRequest) -> Self {
+        Self {
+            name: sea_orm::Set(req.name),
+            created_at: sea_orm::Set(chrono::Utc::now()),
+            ..Default::default()
+        }
+    }
+}
 
 #[derive(Debug, Serialize, ToSchema, FromQueryResult)]
 pub struct TagCloudItem {

@@ -198,12 +198,12 @@ impl AuthService {
         _db_pool: web::Data<DatabaseConnection>,
         _phone: PhoneLogin,
     ) -> HttpResult {
-        Ok(ApiResponse::success("user", "手机号").to_http_response())
+        Err(AppError::NotImplemented("手机号登录暂未开放".into()))
     }
     pub fn login_by_oauth(
         _db_pool: web::Data<DatabaseConnection>,
         _oauth: OAuthLogin,
     ) -> HttpResult {
-        Ok(ApiResponse::success("user", "第三方").to_http_response())
+        Err(AppError::NotImplemented("第三方登录暂未开放".into()))
     }
 }

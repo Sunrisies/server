@@ -14,3 +14,5 @@ pub mod upload;
 pub use email::send_verification_code;
 pub mod images;
 pub mod links;
+
+pub mod management;

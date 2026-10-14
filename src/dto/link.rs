@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
 use validator::{Validate, ValidationError};
+fn default_category() -> String {
+    "其他".to_string()
+}
 fn validate_protocol(url: &str) -> Result<(), ValidationError> {
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err(ValidationError::new("invalid_protocol"));
@@ -18,8 +21,10 @@ pub struct CreateLinkRequest {
     pub description: Option<String>,
     #[validate(length(min = 10), custom(function = "validate_protocol"))]
     pub url: String,
+    #[serde(alias = "icon")]
     pub icon_url: Option<String>,
     #[validate(length(min = 1, max = 100))]
+    #[serde(default = "default_category")]
     pub category: String,
     pub tags: Option<Vec<String>>,
 }
@@ -31,6 +36,7 @@ pub struct UpdateLinkRequest {
     pub description: Option<String>,
     #[validate(custom(function = "validate_protocol"))]
     pub url: Option<String>,
+    #[serde(alias = "icon")]
     pub icon_url: Option<String>,
     #[validate(length(min = 1, max = 100))]
     pub category: Option<String>,
@@ -69,6 +75,8 @@ impl From<CreateLinkRequest> for external_links::ActiveModel {
             icon_url: Set(req.icon_url),
             category: Set(req.category),
             tags: Set(tags_json),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
             ..Default::default()
         }
     }

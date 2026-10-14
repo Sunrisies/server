@@ -65,7 +65,7 @@ pub async fn register(
     summary = "登录",
     path = "/api/v1/auth/login",
     tag="鉴权模块",
-    description = "支持密码登录、邮箱验证码登录、手机号登录、第三方登录",
+    description = "支持密码与邮箱验证码登录；手机号、第三方登录暂未开放",
     request_body(
         content = LoginRequest,
         examples(

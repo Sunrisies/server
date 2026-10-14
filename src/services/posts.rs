@@ -375,6 +375,7 @@ impl PostService {
         ip: &str,
     ) -> Result<(), AppError> {
         let post = posts::Entity::find_by_uuid(uuid)
+            .filter(posts::Column::Status.eq(1))
             .one(db)
             .await
             .map_err(|e| {

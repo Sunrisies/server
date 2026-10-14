@@ -668,8 +668,16 @@ mod auth_author_tests {
         )
         .await
         .unwrap();
+        let tag = tags::ActiveModel {
+            name: Set("Privacy tag".into()),
+            created_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .unwrap();
         for (uuid, status) in [("published", 1), ("draft", 0), ("hidden", 2)] {
-            posts::ActiveModel {
+            let post = posts::ActiveModel {
                 uuid: Set(uuid.into()),
                 author_id: Set(user.id),
                 category_id: Set(category.id),
@@ -688,7 +696,51 @@ mod auth_author_tests {
             .insert(&db)
             .await
             .unwrap();
+            post_tags::ActiveModel {
+                post_id: Set(post.id),
+                tag_id: Set(tag.id),
+                ..Default::default()
+            }
+            .insert(&db)
+            .await
+            .unwrap();
         }
+        assert!(matches!(
+            crate::services::posts::PostService::increment_view(&db, "draft", "127.0.0.1").await,
+            Err(AppError::NotFound(_))
+        ));
+        assert!(matches!(
+            crate::handlers::management::delete_category(
+                web::Data::new(db.clone()),
+                web::Path::from(category.id)
+            )
+            .await,
+            Err(AppError::Conflict(_))
+        ));
+        let tagged = crate::handlers::tags::get_posts_by_tag_handler(
+            web::Data::new(db.clone()),
+            web::Path::from(tag.id),
+            web::Query(crate::dto::PaginationQuery {
+                page: 1,
+                limit: 100,
+                category: None,
+                tag: None,
+            }),
+        )
+        .await
+        .unwrap();
+        let tagged: serde_json::Value =
+            serde_json::from_slice(&actix_web::body::to_bytes(tagged.into_body()).await.unwrap())
+                .unwrap();
+        assert_eq!(tagged["data"]["pagination"]["total"], 1);
+        assert_eq!(tagged["data"]["data"][0]["author"], "authorname");
+        let counts = crate::handlers::tags::get_tags_with_count_handler(web::Data::new(db.clone()))
+            .await
+            .unwrap();
+        let counts: serde_json::Value =
+            serde_json::from_slice(&actix_web::body::to_bytes(counts.into_body()).await.unwrap())
+                .unwrap();
+        assert_eq!(counts["data"][0]["count"], 1);
         let app = actix_web::test::init_service(
             actix_web::App::new()
                 .app_data(web::Data::new(db.clone()))
@@ -763,6 +815,14 @@ mod auth_author_tests {
             crate::services::posts::PostService::delete_post(&db, user.id + 1, "published").await,
             Err(AppError::Forbidden(_))
         ));
+        crate::handlers::management::delete_tag(
+            web::Data::new(db.clone()),
+            web::Path::from(tag.id),
+        )
+        .await
+        .unwrap();
+        assert_eq!(post_tags::Entity::find().count(&db).await.unwrap(), 0);
+        assert_eq!(posts::Entity::find().count(&db).await.unwrap(), 3);
         let req = actix_web::test::TestRequest::default().to_http_request();
         let response = get_posts_handler(
             req,

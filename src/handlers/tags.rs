@@ -53,6 +53,7 @@ pub async fn get_tags_with_count_handler(db_pool: web::Data<DatabaseConnection>)
             sea_orm::JoinType::InnerJoin,
             post_tags::Relation::Posts.def(),
         )
+        .filter(posts::Column::Status.eq(1))
         .group_by(tags::Column::Id)
         .group_by(tags::Column::Name)
         .having(Expr::expr(Expr::col(post_tags::Column::PostId).count_distinct()).gt(0))
@@ -87,6 +88,9 @@ pub async fn get_posts_by_tag_handler(
     path: web::Path<i32>, // 标签ID
     query: web::Query<PaginationQuery>,
 ) -> HttpResult {
+    query
+        .validate()
+        .map_err(|e| AppError::ValidationError(ValidationErrorJson::from_validation_errors(&e)))?;
     let tag_id = path.into_inner();
     let PaginationQuery { page, limit, .. } = query.into_inner();
 
@@ -107,6 +111,7 @@ pub async fn get_posts_by_tag_handler(
     let posts = posts::Entity::find()
         .select_only()
         .column(posts::Column::Id)
+        .column(posts::Column::AuthorId)
         .column(posts::Column::Uuid)
         .column(posts::Column::Title)
         .column(posts::Column::CoverImage)
@@ -128,7 +133,7 @@ pub async fn get_posts_by_tag_handler(
             sea_orm::JoinType::LeftJoin,
             posts::Relation::Categories.def(),
         )
-        // .filter(posts::Column::Status.eq(1))
+        .filter(posts::Column::Status.eq(1))
         .order_by_desc(posts::Column::PublishedAt)
         .into_model::<PostWithCategory>()
         .paginate(db_pool.as_ref(), limit);
@@ -136,6 +141,17 @@ pub async fn get_posts_by_tag_handler(
     let total = posts.num_items().await?;
     log::info!("查询标签下的文章: {}", total);
     let posts_with_relations = posts.fetch_page(page - 1).await?;
+    let ids: Vec<i32> = posts_with_relations
+        .iter()
+        .map(|post| post.author_id)
+        .collect();
+    let authors: std::collections::HashMap<i32, String> = crate::models::users::Entity::find()
+        .filter(crate::models::users::Column::Id.is_in(ids))
+        .all(db_pool.get_ref())
+        .await?
+        .into_iter()
+        .map(|user| (user.id, user.user_name))
+        .collect();
     // 3. 构建响应数据
     let posts: Vec<PostResponse> = posts_with_relations
         .into_iter()
@@ -144,7 +160,7 @@ pub async fn get_posts_by_tag_handler(
             uuid: post.uuid,
             title: post.title,
             cover: post.cover_image.unwrap_or_default(),
-            author: "朝阳".to_string(),
+            author: authors.get(&post.author_id).cloned().unwrap_or_default(),
             publish_time: post.published_at,
             update_time: post.updated_at,
             views: post.view_count,

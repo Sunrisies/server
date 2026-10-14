@@ -8,6 +8,10 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         // 管理接口（需要认证）
         web::scope("/v1/links")
+            .route(
+                "/{id}",
+                web::put().to(crate::handlers::management::update_link),
+            )
             .route("", web::post().to(create_external_links_handler))
             .route("", web::get().to(get_external_links_all_handler))
             .route("/{id}", web::get().to(get_external_links_handler))
