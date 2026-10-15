@@ -469,7 +469,6 @@ pub async fn create_post_handler(
     db_pool: web::Data<DatabaseConnection>,
     post_data: web::Json<CreatePostRequest>,
 ) -> HttpResult {
-    log::info!("create_post_handler: {post_data:?}");
     let user_id = current_user_id(&req, db_pool.get_ref()).await?;
     // 验证输入
     if let Err(validation_errors) = post_data.validate() {
