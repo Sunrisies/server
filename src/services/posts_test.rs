@@ -477,4 +477,62 @@ mod tests {
             .unwrap();
         assert_eq!(post.view_count, 1);
     }
+    #[tokio::test]
+    async fn test_equal_timestamps_have_stable_pagination() {
+        use actix_web::{App, test, web};
+        let db = setup_test_db().await;
+        let uuid = view_fixture(&db).await;
+        let base = posts::Entity::find_by_uuid(&uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        let records = (0..210).map(|index| posts::ActiveModel {
+            uuid: Set(Uuid::new_v4().to_string()),
+            author_id: Set(base.author_id),
+            category_id: Set(base.category_id),
+            title: Set(format!("Tie {index}")),
+            content: Set("HTML".into()),
+            markdowncontent: Set("Markdown".into()),
+            status: Set(1),
+            featured: Set(false),
+            view_count: Set(0),
+            size: Set(4),
+            created_at: Set(base.created_at),
+            updated_at: Set(base.updated_at),
+            published_at: Set(base.published_at),
+            ..Default::default()
+        });
+        posts::Entity::insert_many(records).exec(&db).await.unwrap();
+        let app = test::init_service(App::new().app_data(web::Data::new(db)).route(
+            "/posts",
+            web::get().to(crate::handlers::posts::get_posts_all_handler),
+        ))
+        .await;
+        let mut ids = Vec::new();
+        for page in 1..=3 {
+            let response = test::call_service(
+                &app,
+                test::TestRequest::get()
+                    .uri(&format!("/posts?page={page}&limit=100"))
+                    .to_request(),
+            )
+            .await;
+            assert!(response.status().is_success());
+            let data: serde_json::Value = test::read_body_json(response).await;
+            ids.extend(
+                data["data"]["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|post| post["id"].as_i64().unwrap()),
+            );
+        }
+        assert_eq!(ids.len(), 211);
+        assert_eq!(
+            ids.iter().collect::<std::collections::HashSet<_>>().len(),
+            211
+        );
+        assert!(ids.windows(2).all(|pair| pair[0] > pair[1]));
+    }
 }

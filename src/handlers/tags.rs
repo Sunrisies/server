@@ -135,6 +135,7 @@ pub async fn get_posts_by_tag_handler(
         )
         .filter(posts::Column::Status.eq(1))
         .order_by_desc(posts::Column::PublishedAt)
+        .order_by_desc(posts::Column::Id)
         .into_model::<PostWithCategory>()
         .paginate(db_pool.as_ref(), limit);
 

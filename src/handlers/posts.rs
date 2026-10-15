@@ -110,7 +110,9 @@ pub async fn get_posts_all_handler(
             .distinct(); // 避免因一篇文章有多个标签而产生重复
     }
     // 按创建时间倒序
-    let query_builder = query_builder.order_by_desc(posts::Column::CreatedAt);
+    let query_builder = query_builder
+        .order_by_desc(posts::Column::CreatedAt)
+        .order_by_desc(posts::Column::Id);
     // 分页查询（总数会自动应用过滤条件，无需额外处理）
     let paginator = query_builder.paginate(db_pool.as_ref(), limit);
     let total = match paginator.num_items().await {
@@ -406,14 +408,32 @@ pub async fn get_prev_next_handler(
         // 查询上一篇（创建时间更早的）
         posts::Entity::find()
             .filter(posts::Column::Status.eq(1))
-            .filter(posts::Column::CreatedAt.lt(post.created_at))
+            .filter(
+                sea_orm::Condition::any()
+                    .add(posts::Column::CreatedAt.lt(post.created_at))
+                    .add(
+                        sea_orm::Condition::all()
+                            .add(posts::Column::CreatedAt.eq(post.created_at))
+                            .add(posts::Column::Id.lt(post.id))
+                    )
+            )
             .order_by(posts::Column::CreatedAt, Order::Desc)
+            .order_by(posts::Column::Id, Order::Desc)
             .one(db_pool.as_ref()),
         // 查询下一篇（创建时间更晚的）
         posts::Entity::find()
             .filter(posts::Column::Status.eq(1))
-            .filter(posts::Column::CreatedAt.gt(post.created_at))
+            .filter(
+                sea_orm::Condition::any()
+                    .add(posts::Column::CreatedAt.gt(post.created_at))
+                    .add(
+                        sea_orm::Condition::all()
+                            .add(posts::Column::CreatedAt.eq(post.created_at))
+                            .add(posts::Column::Id.gt(post.id))
+                    )
+            )
             .order_by(posts::Column::CreatedAt, Order::Asc)
+            .order_by(posts::Column::Id, Order::Asc)
             .one(db_pool.as_ref())
     )
     .map_err(|e| {
