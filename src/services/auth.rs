@@ -4,7 +4,7 @@ use crate::models::users::ActiveModel;
 use crate::models::{roles, user_roles};
 use crate::utils::crypto_pwd::{hash, verify};
 use crate::utils::jwt::generate_jwt;
-use crate::{ApiResponse, EmailVerificationManager, SseNotifier};
+use crate::{EmailVerificationManager, SseNotifier};
 use crate::{HttpResult, RegisterResponse};
 use actix_web::cookie::{Cookie, SameSite, time::Duration as ActixDuration};
 use actix_web::{HttpResponse, web};
@@ -108,7 +108,13 @@ impl AuthService {
             return Err(AppError::NotFound("用户不存在".to_string()));
         }
         let user = user.unwrap();
-        match verify(&login.password, user.pass_word.as_str()) {
+        // Argon2 must not block an Actix worker during concurrent logins.
+        let password = login.password;
+        let hash = user.pass_word.clone();
+        let verification = web::block(move || verify(&password, &hash))
+            .await
+            .map_err(|_| AppError::InternalServerError("密码验证暂不可用".into()))?;
+        match verification {
             Ok(true) => {
                 // 登录成功
                 let token = generate_jwt(&db_pool, &user).await?;

@@ -570,20 +570,7 @@ pub async fn view_post_handler(
     path: web::Path<String>,
 ) -> HttpResult {
     let uuid = path.into_inner();
-    // 获取客户端 IP
-    let ip = req
-        .headers()
-        .get("X-Forwarded-For")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next().map(|s| s.trim().to_string()))
-        .or_else(|| {
-            req.headers()
-                .get("X-Real-IP")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string())
-        })
-        .or_else(|| req.peer_addr().map(|addr| addr.ip().to_string()))
-        .unwrap_or_else(|| "unknown".to_string());
+    let ip = crate::utils::client_ip::client_ip(&req);
     match crate::services::posts::PostService::increment_view(db_pool.as_ref(), &uuid, &ip).await {
         Ok(_) => {
             Ok(ApiResponse::<EmptyResponse>::success(EmptyResponse, "成功").to_http_response())

@@ -11,7 +11,17 @@ pub async fn setup_test_db() -> DatabaseConnection {
 
     let url = std::env::var("DATABASE_URL_TEST").expect("请在 .env 中设置 DATABASE_URL_TEST");
 
-    log::info!("测试数据库: {}", url);
+    let parsed = url::Url::parse(&url).expect("测试数据库 URL 无效");
+    assert!(
+        matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")),
+        "仅允许本地隔离测试数据库"
+    );
+    let name = parsed.path().trim_start_matches('/');
+    assert!(
+        name.ends_with("_test") || name.starts_with("test_"),
+        "测试数据库名称必须以 test_ 开头或 _test 结尾"
+    );
+    log::info!("使用本地隔离测试数据库");
     let db = Database::connect(&url).await.expect("无法连接到测试数据库");
 
     drop_all_tables(&db).await;

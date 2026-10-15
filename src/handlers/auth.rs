@@ -113,6 +113,7 @@ pub async fn register(
 )]
 #[route_permission(path = "/api/login", method = "post", permission = "auth:login")]
 pub async fn login(
+    req: actix_web::HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
     login: web::Json<LoginRequest>,
     email_manager: web::Data<EmailVerificationManager>, // 添加这行
@@ -122,8 +123,24 @@ pub async fn login(
         return Ok(ApiResponse::from(AppError::ValidationError(msg)).to_http_response());
     }
     match login.0 {
-        LoginRequest::Password(p) => AuthService::login_by_pwd(db_pool, p).await,
-        LoginRequest::Email(e) => AuthService::login_by_email(db_pool, e, email_manager).await,
+        LoginRequest::Password(p) => {
+            crate::utils::login_limit::check(
+                db_pool.get_ref(),
+                &crate::utils::client_ip::client_ip(&req),
+                &p.account,
+            )
+            .await?;
+            AuthService::login_by_pwd(db_pool, p).await
+        }
+        LoginRequest::Email(e) => {
+            crate::utils::login_limit::check(
+                db_pool.get_ref(),
+                &crate::utils::client_ip::client_ip(&req),
+                &format!("email:{}", e.email),
+            )
+            .await?;
+            AuthService::login_by_email(db_pool, e, email_manager).await
+        }
         LoginRequest::Phone(p) => AuthService::login_by_phone(db_pool, p),
         LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o),
     }

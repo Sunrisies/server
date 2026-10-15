@@ -11,12 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: test-only-signing-key-never-use-in-production
+      DATABASE_URL_TEST: postgres://postgres:local-ci-only@127.0.0.1:5432/server_acceptance_test
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: local-ci-only
+          POSTGRES_DB: server_acceptance_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
-      - name: Registration and least-privilege regression tests
-        run: cargo test --locked auth -- --test-threads=1
-      - name: Secret validation and redaction tests
-        run: cargo test --locked jwt_secret_tests
-      - name: Pagination validation
-        run: cargo test --locked pagination_tests
+      - name: Auth, CRUD, atomic views, rollback and configuration regressions
+        run: cargo test --locked -- --test-threads=1

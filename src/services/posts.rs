@@ -350,6 +350,12 @@ impl PostService {
                 AppError::DatabaseError("删除文章失败".to_string())
             })?;
 
+        // Explicitly clean visits for databases whose older FK does not cascade.
+        crate::models::post_views::Entity::delete_many()
+            .filter(crate::models::post_views::Column::PostId.eq(post.id))
+            .exec(&txn)
+            .await?;
+
         // 删除文章
         posts::Entity::delete_by_id(post.id)
             .exec(&txn)
@@ -384,55 +390,39 @@ impl PostService {
             })?
             .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
 
-        use chrono::Utc;
-        let today = Utc::now().date_naive();
-
-        // 检查今天是否已经看过
-        let existing = crate::models::post_views::Entity::find()
-            .filter(crate::models::post_views::Column::PostId.eq(post.id))
-            .filter(crate::models::post_views::Column::Ip.eq(ip))
-            .filter(crate::models::post_views::Column::ViewedDate.eq(today))
-            .one(db)
-            .await
-            .map_err(|e| {
-                log::error!("查询阅读记录失败: {e}");
-                AppError::DatabaseError("服务器错误".to_string())
-            })?;
-
-        if existing.is_some() {
-            log::info!("文章 {} 今日已被该IP访问过，跳过计数", uuid);
-            return Ok(());
-        }
-
-        // 记录本次访问
-        crate::models::post_views::ActiveModel {
-            post_id: sea_orm::ActiveValue::Set(post.id),
-            ip: sea_orm::ActiveValue::Set(ip.to_string()),
-            viewed_date: sea_orm::ActiveValue::Set(today),
-            ..Default::default()
-        }
-        .insert(db)
-        .await
-        .map_err(|e| {
-            log::error!("记录阅读记录失败: {e}");
-            AppError::DatabaseError("服务器错误".to_string())
-        })?;
-
-        // view_count +1
-        posts::Entity::update_many()
-            .filter(posts::Column::Uuid.eq(uuid))
-            .col_expr(
-                posts::Column::ViewCount,
-                Expr::col(posts::Column::ViewCount).add(1),
+        let txn = db.begin().await?;
+        let inserted =
+            crate::models::post_views::Entity::insert(crate::models::post_views::ActiveModel {
+                post_id: Set(post.id),
+                ip: Set(ip.to_string()),
+                viewed_date: Set(Utc::now().date_naive()),
+                ..Default::default()
+            })
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns([
+                    crate::models::post_views::Column::PostId,
+                    crate::models::post_views::Column::Ip,
+                    crate::models::post_views::Column::ViewedDate,
+                ])
+                .do_nothing()
+                .to_owned(),
             )
-            .exec(db)
-            .await
-            .map_err(|e| {
-                log::error!("更新阅读数失败: {e}");
-                AppError::DatabaseError("更新失败".to_string())
-            })?;
+            .exec_without_returning(&txn)
+            .await?;
 
-        log::info!("文章 {} 阅读数 +1（当前 {}）", uuid, post.view_count + 1);
+        // Duplicate visits are successful no-ops. A failed counter update rolls
+        // back the visit too, so a retry can still increment it correctly.
+        if inserted > 0 {
+            posts::Entity::update_many()
+                .filter(posts::Column::Id.eq(post.id))
+                .col_expr(
+                    posts::Column::ViewCount,
+                    Expr::col(posts::Column::ViewCount).add(1),
+                )
+                .exec(&txn)
+                .await?;
+        }
+        txn.commit().await?;
         Ok(())
     }
 }

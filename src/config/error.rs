@@ -167,7 +167,11 @@ impl ResponseError for AppError {
     }
 
     fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.status_code()).json(self.to_response())
+        let mut response = HttpResponse::build(self.status_code());
+        if matches!(self, AppError::RateLimited(_)) {
+            response.insert_header(("Retry-After", "300"));
+        }
+        response.json(self.to_response())
     }
 }
 

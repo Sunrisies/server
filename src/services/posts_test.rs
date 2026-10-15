@@ -365,4 +365,116 @@ mod tests {
             .await
             .expect("删除测试文章失败");
     }
+    async fn view_fixture(db: &DatabaseConnection) -> String {
+        let user = create_test_user(db).await;
+        let category = create_test_category(db).await;
+        PostService::create_post(
+            db,
+            user.id,
+            CreatePostRequest {
+                title: "Concurrent view fixture".into(),
+                summary: None,
+                content: "<p>Test</p>".into(),
+                markdowncontent: "## Test".into(),
+                cover_image: None,
+                category_id: category.id,
+                tag_ids: vec![],
+                status: 1,
+                featured: false,
+            },
+        )
+        .await
+        .unwrap()
+        .uuid
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_views_are_successful_and_count_once() {
+        use sea_orm::ConnectionTrait;
+        let db = setup_test_db().await;
+        let uuid = view_fixture(&db).await;
+        let mut tasks = Vec::new();
+        for _ in 0..40 {
+            let db = db.clone();
+            let uuid = uuid.clone();
+            tasks.push(tokio::spawn(async move {
+                PostService::increment_view(&db, &uuid, "198.51.100.1").await
+            }));
+        }
+        for task in tasks {
+            task.await.unwrap().unwrap();
+        }
+        let post = posts::Entity::find_by_uuid(&uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(post.view_count, 1);
+        let row = db
+            .query_one(sea_orm::Statement::from_string(
+                db.get_database_backend(),
+                "SELECT COUNT(*) AS total FROM post_views".to_owned(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i64>("", "total").unwrap(), 1);
+        PostService::delete_post(&db, post.author_id, &uuid)
+            .await
+            .unwrap();
+        assert!(
+            posts::Entity::find_by_uuid(&uuid)
+                .one(&db)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_failed_counter_update_rolls_back_visit_and_can_retry() {
+        use sea_orm::ConnectionTrait;
+        let db = setup_test_db().await;
+        let uuid = view_fixture(&db).await;
+        for sql in [
+            "CREATE OR REPLACE FUNCTION test_reject_view() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'isolated test failure'; END $$",
+            "CREATE TRIGGER test_reject_view BEFORE UPDATE OF view_count ON posts FOR EACH ROW EXECUTE FUNCTION test_reject_view()",
+        ] {
+            db.execute(sea_orm::Statement::from_string(
+                db.get_database_backend(),
+                sql.to_owned(),
+            ))
+            .await
+            .unwrap();
+        }
+        assert!(
+            PostService::increment_view(&db, &uuid, "198.51.100.1")
+                .await
+                .is_err()
+        );
+        let row = db
+            .query_one(sea_orm::Statement::from_string(
+                db.get_database_backend(),
+                "SELECT COUNT(*) AS total FROM post_views".to_owned(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i64>("", "total").unwrap(), 0);
+        db.execute(sea_orm::Statement::from_string(
+            db.get_database_backend(),
+            "DROP TRIGGER test_reject_view ON posts".to_owned(),
+        ))
+        .await
+        .unwrap();
+        PostService::increment_view(&db, &uuid, "198.51.100.1")
+            .await
+            .unwrap();
+        let post = posts::Entity::find_by_uuid(&uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(post.view_count, 1);
+    }
 }
