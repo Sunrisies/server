@@ -23,3 +23,5 @@ pub mod users;
 pub mod verification_codes;
 
 pub mod revoked_tokens;
+
+pub mod media_upload_jobs;

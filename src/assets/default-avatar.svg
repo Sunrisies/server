@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="默认用户头像">
+<title>星际小伙伴</title>
+<defs>
+<radialGradient id="space" cx="25%" cy="15%" r="100%"><stop stop-color="#344574"/><stop offset=".6" stop-color="#192b48"/><stop offset="1" stop-color="#0b2836"/></radialGradient>
+<linearGradient id="shell" x1="0" y1="0" x2=".85" y2="1"><stop stop-color="#ffffff"/><stop offset=".55" stop-color="#e8f5f5"/><stop offset="1" stop-color="#aacccd"/></linearGradient>
+<linearGradient id="glass" x2=".6" y2="1"><stop stop-color="#253f55"/><stop offset="1" stop-color="#0d2739"/></linearGradient>
+<linearGradient id="mint" x2="1" y2="1"><stop stop-color="#b8ffee"/><stop offset="1" stop-color="#4fdcbe"/></linearGradient>
+<clipPath id="crop"><circle cx="128" cy="128" r="128"/></clipPath>
+</defs>
+<g clip-path="url(#crop)">
+<rect width="256" height="256" fill="url(#space)"/>
+<circle cx="202" cy="38" r="73" fill="#7295d9" opacity=".10"/>
+<path d="M-23 180C55 70 201 31 285 97" fill="none" stroke="#a2c0ec" stroke-width="1" opacity=".18"/>
+<circle cx="45" cy="61" r="3" fill="#b5f5e8"/><circle cx="216" cy="157" r="2" fill="#d5e5ff" opacity=".65"/>
+<path d="M201 58v12m-6-6h12" stroke="#c5d5ff" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="129" cy="218" rx="80" ry="17" fill="#061c2b" opacity=".4"/>
+<path d="M62 260v-29c0-36 24-58 66-58s66 22 66 58v29" fill="url(#shell)"/>
+<path d="M79 258v-27c0-17 6-30 17-39m81 66v-27c0-17-6-30-17-39" fill="none" stroke="#b5d9d6" stroke-width="5"/>
+<rect x="106" y="207" width="44" height="28" rx="11" fill="#bedad8"/><rect x="112" y="212" width="32" height="17" rx="7" fill="url(#mint)"/>
+<circle cx="128" cy="220" r="3" fill="#278b82"/>
+<rect x="47" y="108" width="22" height="48" rx="11" fill="#8baeb7"/><rect x="187" y="108" width="22" height="48" rx="11" fill="#8baeb7"/>
+<rect x="49" y="113" width="10" height="34" rx="5" fill="url(#mint)"/><rect x="197" y="113" width="10" height="34" rx="5" fill="url(#mint)"/>
+<rect x="62" y="57" width="132" height="134" rx="57" fill="#071d2b" opacity=".28" transform="translate(0 5)"/>
+<rect x="62" y="53" width="132" height="134" rx="57" fill="url(#shell)"/>
+<path d="M83 88c8-17 23-24 43-24" stroke="#ffffff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".9"/>
+<rect x="73" y="84" width="110" height="85" rx="36" fill="url(#glass)"/>
+<path d="M88 103c13-13 36-15 56-12" stroke="#6d9aad" stroke-width="3" stroke-linecap="round" fill="none" opacity=".22"/>
+<rect x="95" y="113" width="13" height="21" rx="6.5" fill="url(#mint)"/><rect x="148" y="113" width="13" height="21" rx="6.5" fill="url(#mint)"/>
+<path d="M117 143q11 10 22 0" fill="none" stroke="#98f6df" stroke-width="4" stroke-linecap="round"/>
+<ellipse cx="90" cy="141" rx="6" ry="3" fill="#92b8c9" opacity=".25"/><ellipse cx="166" cy="141" rx="6" ry="3" fill="#92b8c9" opacity=".25"/>
+<rect x="115" y="173" width="26" height="5" rx="2.5" fill="#7badae"/>
+</g></svg>

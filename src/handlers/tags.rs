@@ -160,7 +160,10 @@ pub async fn get_posts_by_tag_handler(
             id: post.id,
             uuid: post.uuid,
             title: post.title,
-            cover: post.cover_image.unwrap_or_default(),
+            cover: crate::services::category_cover::cover_url(
+                post.cover_image,
+                post.category_id.unwrap_or_default(),
+            ),
             author: authors.get(&post.author_id).cloned().unwrap_or_default(),
             publish_time: post.published_at,
             update_time: post.updated_at,

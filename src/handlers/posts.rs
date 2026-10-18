@@ -3,7 +3,6 @@ use actix_web::{HttpMessage, HttpRequest, web};
 use crate::EmptyResponse;
 use crate::config::AppError;
 use crate::dto::PaginatedResp;
-use crate::dto::PaginationQuery;
 use crate::dto::common::Pagination;
 use crate::dto::posts::PrevNextResponse;
 use crate::dto::posts::PrevNextResult;
@@ -62,7 +61,9 @@ use validator::Validate;
         ("page" = u64, Query, description = "页码",example = 1),
         ("limit" = u64, Query, description = "每页数量",example = 10),
         ("category" = Option<i32>, Query, description = "分类ID",nullable  = false),
-        ("tag" = Option<i32>, Query, description = "标签ID",nullable=false)
+        ("tag" = Option<i32>, Query, description = "标签ID",nullable=false),
+        ("search" = Option<String>, Query, description = "标题关键词（最多100字符）"),
+        ("status" = Option<i16>, Query, description = "文章状态：0草稿、1发布、2下线；游客始终仅可见发布内容")
     ),
     responses(
         (status = 200, description = "成功获取文章列表", body = PaginatedResp<PostResponse>),
@@ -72,17 +73,13 @@ use validator::Validate;
 pub async fn get_posts_all_handler(
     req: HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
-    query: web::Query<PaginationQuery>,
+    query: web::Query<crate::dto::posts::PostQuery>,
 ) -> HttpResult {
     query
         .validate()
         .map_err(|e| AppError::ValidationError(ValidationErrorJson::from_validation_errors(&e)))?;
-    let PaginationQuery {
-        page,
-        limit,
-        category,
-        tag,
-    } = query.into_inner();
+    let filters = query.into_inner();
+    let (page, limit, category, tag) = (filters.page, filters.limit, filters.category, filters.tag);
     // 1. 构建基础查询（文章 + 分类）
     let mut query_builder = posts::Entity::find().find_also_related(categories::Entity);
 
@@ -92,6 +89,34 @@ pub async fn get_posts_all_handler(
         .is_none()
     {
         query_builder = query_builder.filter(posts::Column::Status.eq(1));
+    }
+    if let Some(status) = filters.status {
+        query_builder = query_builder.filter(posts::Column::Status.eq(status));
+    }
+    if let Some(search) = filters.search.filter(|s| !s.trim().is_empty()) {
+        // Literal title search: escape LIKE metacharacters rather than treating them as wildcards.
+        let search = search
+            .trim()
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        let pattern =
+            sea_orm::sea_query::LikeExpr::new(format!("%{}%", search.to_lowercase())).escape('\\');
+        query_builder = query_builder.filter(
+            sea_orm::Condition::any()
+                .add(
+                    sea_orm::prelude::Expr::expr(sea_orm::sea_query::Func::lower(
+                        sea_orm::prelude::Expr::col((posts::Entity, posts::Column::Title)),
+                    ))
+                    .like(pattern.clone()),
+                )
+                .add(
+                    sea_orm::prelude::Expr::expr(sea_orm::sea_query::Func::lower(
+                        sea_orm::prelude::Expr::col((posts::Entity, posts::Column::Summary)),
+                    ))
+                    .like(pattern),
+                ),
+        );
     }
     // 新增：如果传入了分类ID，则添加过滤条件
     if let Some(cat_id) = category {
@@ -197,7 +222,10 @@ pub async fn get_posts_all_handler(
                 id: post.id,
                 uuid: post.uuid,
                 title: post.title,
-                cover: post.cover_image.unwrap_or_default(),
+                cover: crate::services::category_cover::cover_url(
+                    post.cover_image,
+                    post.category_id,
+                ),
                 author,
                 publish_time: post.published_at,
                 update_time: post.updated_at,
@@ -331,11 +359,13 @@ pub async fn get_posts_handler(
         name: category.name,
     });
 
-    let author = crate::models::users::Entity::find_by_id(post.author_id)
+    let author_user = crate::models::users::Entity::find_by_id(post.author_id)
         .one(db_pool.get_ref())
-        .await?
-        .map(|user| user.user_name)
-        .unwrap_or_default();
+        .await?;
+    let author_avatar = crate::services::avatar::avatar_url(
+        author_user.as_ref().and_then(|user| user.image.as_deref()),
+    );
+    let author = author_user.map(|user| user.user_name).unwrap_or_default();
 
     let response = PostListResponse {
         id: post.id,
@@ -350,8 +380,9 @@ pub async fn get_posts_handler(
             .extensions()
             .get::<crate::middleware::auth::AdminAccess>()
             .map(|_| post.markdowncontent),
-        cover: post.cover_image.unwrap_or_default(),
+        cover: crate::services::category_cover::cover_url(post.cover_image, post.category_id),
         author,
+        author_avatar,
         publish_time: post.published_at,
         update_time: post.updated_at,
         views: post.view_count,
@@ -534,6 +565,25 @@ pub async fn update_post_handler(
         Ok(post) => Ok(ApiResponse::success(post, "文章更新成功").to_http_response()),
         Err(e) => Ok(ApiResponse::from(e).to_http_response()),
     }
+}
+
+/// 文章版本仅对文章作者开放；恢复版本由管理端把快照提交至普通更新接口，
+/// 因而会自然产生一个新的历史版本，不会覆盖既有记录。
+pub async fn get_post_versions_handler(
+    req: HttpRequest,
+    db_pool: web::Data<DatabaseConnection>,
+    path: web::Path<String>,
+) -> HttpResult {
+    let user_id = current_user_id(&req, db_pool.get_ref()).await?;
+    let post = posts::Entity::find_by_uuid(&path.into_inner())
+        .one(db_pool.as_ref())
+        .await?
+        .ok_or_else(|| AppError::NotFound("文章不存在".into()))?;
+    if post.author_id != user_id {
+        return Err(AppError::Forbidden("没有权限查看版本历史".into()));
+    }
+    let versions = crate::services::post_versions::list(db_pool.as_ref(), post.id).await?;
+    Ok(ApiResponse::success(versions, "成功").to_http_response())
 }
 
 // 为删除文章的处理函数添加OpenAPI文档

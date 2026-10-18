@@ -1,0 +1,12 @@
+{
+  "name": "web-server",
+  "version": "0.1.20",
+  "previousVersion": "0.1.20",
+  "build": "production-20261018-content-discovery",
+  "buildDate": "2026-10-18T00:00:00+08:00",
+  "buildTimestamp": "20261018000000",
+  "gitHash": "working-tree",
+  "gitBranch": "codex/fix-auth-p0",
+  "environment": "production",
+  "language": "rust"
+}

@@ -26,11 +26,17 @@ pub async fn setup_test_db() -> DatabaseConnection {
 
     drop_all_tables(&db).await;
     run_migrations(&db).await;
+    crate::services::content_revision::initialize(&db)
+        .await
+        .unwrap();
+    crate::services::upload_jobs::initialize(&db).await.unwrap();
     db
 }
 
 async fn drop_all_tables(db: &DatabaseConnection) {
     let tables = [
+        "media_upload_jobs",
+        "public_content_revision",
         "post_views",
         "clipboard_entries",
         "clipboard_channels",
@@ -59,6 +65,16 @@ async fn drop_all_tables(db: &DatabaseConnection) {
 }
 
 async fn run_migrations(db: &DatabaseConnection) {
+    let schema = sea_orm::Schema::new(db.get_database_backend());
+    for table in [
+        schema.create_table_from_entity(crate::models::images::Entity),
+        schema.create_table_from_entity(crate::models::uploads::Entity),
+        schema.create_table_from_entity(crate::models::external_links::Entity),
+    ] {
+        db.execute(db.get_database_backend().build(&table))
+            .await
+            .expect("media table creation failed");
+    }
     for (name, sql) in MIGRATIONS {
         let r = db
             .execute(Statement::from_string(

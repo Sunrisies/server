@@ -32,10 +32,10 @@ pub struct PaginationQuery {
     /// 标签搜索
     pub tag: Option<i32>,
 }
-fn default_page() -> u64 {
+pub(crate) fn default_page() -> u64 {
     1
 }
-fn default_limit() -> u64 {
+pub(crate) fn default_limit() -> u64 {
     10
 }
 

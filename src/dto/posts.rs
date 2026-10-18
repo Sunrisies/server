@@ -24,6 +24,7 @@ pub struct PostListResponse {
     pub title: String,
     pub cover: String,
     pub author: String,
+    pub author_avatar: String,
     pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub htmlcontent: Option<String>,
@@ -157,4 +158,21 @@ mod auth_post_input_tests {
             serde_json::from_value(serde_json::json!({"status":-1})).unwrap();
         assert!(update.validate().is_err());
     }
+}
+
+/// 管理列表筛选；游客始终只能读取已发布内容。
+#[derive(Debug, Deserialize, validator::Validate)]
+pub struct PostQuery {
+    #[serde(default = "crate::dto::common::default_page")]
+    #[validate(range(min = 1))]
+    pub page: u64,
+    #[serde(default = "crate::dto::common::default_limit")]
+    #[validate(range(min = 1, max = 100))]
+    pub limit: u64,
+    pub category: Option<i32>,
+    pub tag: Option<i32>,
+    #[validate(length(max = 100))]
+    pub search: Option<String>,
+    #[validate(range(min = 0, max = 2))]
+    pub status: Option<i16>,
 }

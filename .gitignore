@@ -9,3 +9,6 @@ change-commit-date.sh
 openapi.json
 git_purge_file.sh
 .codebuddy/
+
+# Runtime local image storage
+/data/images/

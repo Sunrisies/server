@@ -6,8 +6,7 @@ use crate::services::qiniu;
 use chrono::Utc;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder,
+    ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryOrder,
 };
 use uuid::Uuid;
 
@@ -15,8 +14,8 @@ pub struct UploadsService;
 
 impl UploadsService {
     /// 保存上传记录到 DB
-    pub async fn save(
-        db: &DatabaseConnection,
+    pub async fn save<C: ConnectionTrait>(
+        db: &C,
         result: &qiniu::UploadResult,
     ) -> Result<uploads::Model, AppError> {
         let now = Utc::now();
@@ -42,9 +41,18 @@ impl UploadsService {
         page: u64,
         limit: u64,
     ) -> Result<(Vec<uploads::Model>, u64), AppError> {
-        let limit = limit.min(100);
+        let valid_offset = page
+            .checked_sub(1)
+            .and_then(|page| page.checked_mul(limit))
+            .is_some_and(|offset| offset <= i64::MAX as u64);
+        if !valid_offset || !(1..=100).contains(&limit) {
+            return Err(AppError::BadRequest(
+                "页码必须大于0，每页数量必须为1到100".into(),
+            ));
+        }
         let paginator = uploads::Entity::find()
             .order_by_desc(uploads::Column::CreatedAt)
+            .order_by_desc(uploads::Column::Id)
             .paginate(db, limit);
 
         let total = paginator
@@ -61,23 +69,8 @@ impl UploadsService {
 
     /// 删除上传记录（同步删除七牛文件）
     pub async fn delete(db: &DatabaseConnection, uuid: &str) -> Result<(), AppError> {
-        let record = uploads::Entity::find()
-            .filter(uploads::Column::Uuid.eq(uuid))
-            .one(db)
-            .await
-            .map_err(|e| AppError::DatabaseError(format!("查询失败: {e}")))?
-            .ok_or_else(|| AppError::NotFound("上传记录不存在".to_string()))?;
-
-        // 尝试删除七牛文件（失败仅 warn，不阻塞 DB 删除）
-        if let Err(e) = qiniu::delete_from_qiniu(&record.key) {
-            log::warn!("七牛删除失败(忽略): {} - {}", record.key, e);
-        }
-
-        uploads::Entity::delete_by_id(record.id)
-            .exec(db)
-            .await
-            .map_err(|e| AppError::DatabaseError(format!("删除失败: {e}")))?;
-
+        let image_id = crate::services::images::ImageService::import_upload(db, uuid).await?;
+        crate::services::images::ImageService::delete_image(db, image_id).await?;
         Ok(())
     }
 }

@@ -105,12 +105,23 @@ fn public_request(path: &str, method: &Method) -> bool {
     {
         return true;
     }
+    if [
+        "/api/v1/users/default-avatar.svg",
+        "/api/v1/users/default-avatar.webp",
+    ]
+    .contains(&path)
+    {
+        return *method == Method::GET || *method == Method::HEAD;
+    }
+    if within(path, "/api/v1/images") {
+        return path.starts_with("/api/v1/images/file/")
+            && (*method == Method::GET || *method == Method::HEAD);
+    }
     [
         "/api/v1/posts",
         "/api/v1/tags",
         "/api/v1/categories",
         "/api/v1/links",
-        "/api/v1/images",
         "/api/v1/version",
     ]
     .iter()

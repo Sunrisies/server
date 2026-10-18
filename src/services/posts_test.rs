@@ -4,9 +4,55 @@ mod tests {
     use crate::models::{categories, post_tags, posts, tags, users};
     use crate::services::posts::PostService;
     use sea_orm::{
-        ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+        ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel,
+        QueryFilter, Set,
     };
     use uuid::Uuid;
+
+    #[tokio::test]
+    async fn markdown_only_draft_can_be_published_with_current_timestamp() {
+        let db = setup_test_db().await;
+        let user = create_test_user(&db).await;
+        let category = create_test_category(&db).await;
+        let tag = create_test_tag(&db, "写作流程".into()).await;
+        let markdown = "# 仅写 Markdown\n\n正文";
+        let created = PostService::create_post(
+            &db,
+            user.id,
+            CreatePostRequest {
+                title: "草稿到发布".into(),
+                summary: None,
+                content: String::new(),
+                markdowncontent: markdown.into(),
+                cover_image: None,
+                category_id: category.id,
+                tag_ids: vec![tag.id],
+                status: 0,
+                featured: false,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(created.size as usize, markdown.len());
+        let mut draft = posts::Entity::find_by_uuid(&created.uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap()
+            .into_active_model();
+        let old_date = chrono::Utc::now() - chrono::Duration::days(1);
+        draft.published_at = Set(old_date);
+        draft.update(&db).await.unwrap();
+        let update: UpdatePostRequest =
+            serde_json::from_value(serde_json::json!({"status":1,"markdowncontent":"# 新正文"}))
+                .unwrap();
+        let published = PostService::update_post(&db, user.id, &created.uuid, update)
+            .await
+            .unwrap();
+        assert!(published.is_publish);
+        assert!(published.publish_time > old_date);
+        assert_eq!(published.size as usize, "# 新正文".len());
+    }
 
     // 测试创建文章
     #[tokio::test]

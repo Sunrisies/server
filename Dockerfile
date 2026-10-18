@@ -9,6 +9,7 @@ WORKDIR /app
 # 先复制 Cargo.toml 和 Cargo.lock
 COPY Cargo.toml Cargo.lock ./
 COPY route-macros ./route-macros
+COPY route-macros-types ./route-macros-types
 # 创建一个空的 src/main.rs 来缓存依赖
 RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \
@@ -25,7 +26,6 @@ RUN cargo build --release
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/target/release/web-server .
-COPY --from=builder /app/.env .
 # 复制版本信息文件
 COPY --from=builder /app/.docker/version.json .docker/version.json
 CMD ["./web-server"]
