@@ -16,3 +16,4 @@ pub mod images;
 pub mod links;
 
 pub mod management;
+pub mod site_features;

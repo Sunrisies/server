@@ -29,3 +29,4 @@ pub mod upload_jobs;
 pub mod category_cover;
 
 pub mod avatar;
+pub mod site_features;

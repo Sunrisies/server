@@ -6,6 +6,7 @@ pub mod images;
 pub mod links;
 pub mod posts;
 pub mod rooms;
+pub mod site_features;
 pub mod tags;
 pub mod upload;
 pub mod users;
@@ -39,6 +40,7 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
             .configure(email::config_routes)
             // 房间路由
             .configure(rooms::config_routes)
+            .configure(site_features::config_routes)
             // 获取当前版本信息
             .route("/v1/version", web::get().to(get_version)),
     );

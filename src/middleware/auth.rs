@@ -86,6 +86,8 @@ fn public_request(path: &str, method: &Method) -> bool {
         "/api/v1/auth/register",
         "/api/v1/auth/logout",
         "/api/v1/email/send-verification-code",
+        "/api/v1/feedback",
+        "/api/v1/subscriptions",
     ]
     .contains(&path)
     {

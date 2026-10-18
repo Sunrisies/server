@@ -34,6 +34,7 @@ async fn main() -> Result<()> {
     web_server::utils::login_limit::initialize(&db).await?;
     web_server::services::content_revision::initialize(&db).await?;
     web_server::services::post_versions::initialize(&db).await?;
+    web_server::services::site_features::initialize(&db).await?;
     web_server::services::upload_jobs::initialize(&db).await?;
     web_server::services::images::ImageService::backfill_legacy(&db).await?;
     web_server::services::upload_jobs::start_recovery(db.clone());
