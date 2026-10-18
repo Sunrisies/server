@@ -13,6 +13,8 @@ pub struct Model {
     pub name: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
+    /// 创建该空间的站点账号。旧频道允许为空，仍可通过空间码访问。
+    pub owner_uuid: Option<String>,
     #[schema(value_type = String, format = DateTime)]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[schema(value_type = String, format = DateTime)]

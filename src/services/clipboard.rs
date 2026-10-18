@@ -40,6 +40,7 @@ impl ClipboardService {
     pub async fn create_channel(
         db: &DatabaseConnection,
         req: CreateChannelRequest,
+        owner_uuid: Option<String>,
     ) -> Result<AuthChannelResponse, AppError> {
         let name = req.name.trim().to_string();
         if name.is_empty() {
@@ -68,6 +69,7 @@ impl ClipboardService {
         let model = clipboard_channels::ActiveModel {
             name: Set(name.clone()),
             password_hash: Set(pwd_hash),
+            owner_uuid: Set(owner_uuid),
             created_at: Set(now),
             updated_at: Set(now),
             ..Default::default()
@@ -80,6 +82,29 @@ impl ClipboardService {
 
         let token = channel_jwt::generate_channel_token(channel.id, &channel.name)?;
 
+        Ok(AuthChannelResponse {
+            channel_id: channel.id,
+            channel_name: channel.name,
+            token,
+        })
+    }
+
+    /// 登录用户可在任意设备重新取得自己的存储空间凭证。
+    pub async fn my_channel(
+        db: &DatabaseConnection,
+        owner_uuid: &str,
+    ) -> Result<AuthChannelResponse, AppError> {
+        let channel = clipboard_channels::Entity::find()
+            .filter(clipboard_channels::Column::OwnerUuid.eq(owner_uuid))
+            .order_by_desc(clipboard_channels::Column::UpdatedAt)
+            .one(db)
+            .await
+            .map_err(|e| {
+                error!("查询个人存储空间失败: {:?}", e);
+                AppError::DatabaseError("查询失败".to_string())
+            })?
+            .ok_or_else(|| AppError::NotFound("当前账号还没有存储空间".to_string()))?;
+        let token = channel_jwt::generate_channel_token(channel.id, &channel.name)?;
         Ok(AuthChannelResponse {
             channel_id: channel.id,
             channel_name: channel.name,
