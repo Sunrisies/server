@@ -435,7 +435,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_concurrent_views_are_successful_and_count_once() {
+    async fn test_concurrent_views_count_each_read_and_keep_one_daily_visitor_record() {
         use sea_orm::ConnectionTrait;
         let db = setup_test_db().await;
         let uuid = view_fixture(&db).await;
@@ -455,7 +455,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(post.view_count, 1);
+        assert_eq!(post.view_count, 40);
         let row = db
             .query_one(sea_orm::Statement::from_string(
                 db.get_database_backend(),

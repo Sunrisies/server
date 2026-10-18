@@ -429,7 +429,8 @@ impl PostService {
         Ok(())
     }
 
-    /// 增加文章阅读数（IP + 日期去重）
+    /// 增加文章阅读数。每日 IP 记录仅用于独立访客统计，不能用于阅读数去重：
+    /// 同一读者重新打开文章也应当算一次阅读。
     pub async fn increment_view(
         db: &DatabaseConnection,
         uuid: &str,
@@ -446,7 +447,7 @@ impl PostService {
             .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
 
         let txn = db.begin().await?;
-        let inserted =
+        let _inserted =
             crate::models::post_views::Entity::insert(crate::models::post_views::ActiveModel {
                 post_id: Set(post.id),
                 ip: Set(ip.to_string()),
@@ -465,18 +466,17 @@ impl PostService {
             .exec_without_returning(&txn)
             .await?;
 
-        // Duplicate visits are successful no-ops. A failed counter update rolls
-        // back the visit too, so a retry can still increment it correctly.
-        if inserted > 0 {
-            posts::Entity::update_many()
-                .filter(posts::Column::Id.eq(post.id))
-                .col_expr(
-                    posts::Column::ViewCount,
-                    Expr::col(posts::Column::ViewCount).add(1),
-                )
-                .exec(&txn)
-                .await?;
-        }
+        // The daily record may already exist, but every valid page opening is a
+        // reading event. Keep both operations in one transaction so a failed
+        // counter update never leaves an inconsistent visit record behind.
+        posts::Entity::update_many()
+            .filter(posts::Column::Id.eq(post.id))
+            .col_expr(
+                posts::Column::ViewCount,
+                Expr::col(posts::Column::ViewCount).add(1),
+            )
+            .exec(&txn)
+            .await?;
         txn.commit().await?;
         Ok(())
     }
