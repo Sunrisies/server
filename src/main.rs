@@ -36,6 +36,8 @@ async fn main() -> Result<()> {
     web_server::services::post_versions::initialize(&db).await?;
     web_server::services::site_features::initialize(&db).await?;
     web_server::services::upload_jobs::initialize(&db).await?;
+    web_server::dropbox::initialize(&db).await?;
+    web_server::dropbox::start_cleanup_task(db.clone());
     web_server::services::images::ImageService::backfill_legacy(&db).await?;
     web_server::services::upload_jobs::start_recovery(db.clone());
     web_server::observability::sample_pool(&db);

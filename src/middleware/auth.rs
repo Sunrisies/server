@@ -93,9 +93,14 @@ fn public_request(path: &str, method: &Method) -> bool {
     {
         return *method == Method::POST;
     }
-    // These handlers authenticate clipboard/room tokens themselves.
+    // Clipboard and room handlers authenticate their own tokens. Drop uploads
+    // remain public at the route layer so text can be anonymous; media uploads
+    // check the JWT claims inserted below.
     if within(path, "/api/v1/clipboard") {
         return path != "/api/v1/clipboard/channel";
+    }
+    if within(path, "/api/v1/drop") {
+        return *method == Method::GET || *method == Method::POST;
     }
     if within(path, "/api/v1/rooms") || ["/api/v1/ws", "/api/v1/sse"].contains(&path) {
         return true;

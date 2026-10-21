@@ -32,6 +32,7 @@ pub fn config_routes(cfg: &mut web::ServiceConfig) {
             .configure(links::config_routes)
             // 剪贴板路由
             .configure(clipboard::config_routes)
+            .configure(crate::dropbox::config_routes)
             // 上传路由
             .configure(upload::config_routes)
             // 图片路由
