@@ -103,10 +103,10 @@ impl AppError {
             | AppError::TokenExpired(_)
             | AppError::TokenInvalid(_) => StatusCode::UNAUTHORIZED,
             AppError::Forbidden(_) => StatusCode::FORBIDDEN,
-            AppError::BadRequest(_) | AppError::ValidationError(_) | AppError::UploadFailed(_) => {
-                StatusCode::BAD_REQUEST
+            AppError::BadRequest(_) | AppError::UploadFailed(_) => StatusCode::BAD_REQUEST,
+            AppError::ValidationError(_) | AppError::UnprocessableEntity(_) => {
+                StatusCode::UNPROCESSABLE_ENTITY
             }
-            AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::AlreadyExists(_) | AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::RateLimited(_) => StatusCode::TOO_MANY_REQUESTS,
@@ -158,10 +158,20 @@ impl fmt::Display for AppError {
     }
 }
 
+impl std::error::Error for AppError {}
+
 // 实现 ResponseError trait 用于 Actix-web 错误处理
 impl ResponseError for AppError {
+    fn status_code(&self) -> StatusCode {
+        AppError::status_code(self)
+    }
+
     fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.status_code()).json(self.to_response())
+        let mut response = HttpResponse::build(self.status_code());
+        if matches!(self, AppError::RateLimited(_)) {
+            response.insert_header(("Retry-After", "300"));
+        }
+        response.json(self.to_response())
     }
 }
 
@@ -203,6 +213,29 @@ impl From<jsonwebtoken::errors::Error> for AppError {
                 AppError::TokenExpired("Token has expired".to_string())
             }
             _ => AppError::TokenInvalid("Invalid token".to_string()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod auth_error_tests {
+    use super::*;
+    #[test]
+    fn auth_error_statuses_are_consistent() {
+        for error in [
+            AppError::Unauthorized("expired".into()),
+            AppError::Forbidden("denied".into()),
+            AppError::NotFound("missing".into()),
+            AppError::BadRequest("invalid".into()),
+        ] {
+            assert_eq!(
+                ResponseError::status_code(&error),
+                AppError::status_code(&error)
+            );
+            assert_eq!(
+                error.error_response().status(),
+                AppError::status_code(&error)
+            );
         }
     }
 }

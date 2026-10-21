@@ -7,7 +7,6 @@ use sea_orm::DatabaseConnection;
 
 use crate::config::AppError;
 use crate::dto::common::{PaginatedResp, Pagination};
-use crate::services::qiniu;
 use crate::services::uploads::UploadsService;
 use crate::{ApiResponse, EmptyResponse, HttpResult};
 
@@ -36,9 +35,12 @@ pub async fn upload_file_handler(
             .and_then(|cd| cd.get_name().map(|s| s.to_string()))
             .unwrap_or_default();
         if field_name == "file" {
-            let result = qiniu::upload_file(&mut field, "uploads", true).await?;
-            // 记录到 DB
-            UploadsService::save(db.as_ref(), &result).await?;
+            let (result, _) = crate::services::images::ImageService::upload_and_store(
+                db.get_ref().clone(),
+                &mut field,
+                "uploads",
+            )
+            .await?;
             return Ok(ApiResponse::success(result, "文件上传成功").to_http_response());
         }
     }

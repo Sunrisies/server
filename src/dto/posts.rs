@@ -24,7 +24,12 @@ pub struct PostListResponse {
     pub title: String,
     pub cover: String,
     pub author: String,
+    pub author_avatar: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub htmlcontent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub markdowncontent: Option<String>,
     #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub publish_time: chrono::DateTime<chrono::Utc>,
@@ -74,7 +79,7 @@ pub struct CreatePostRequest {
     #[validate(length(max = 500, message = "摘要长度不能超过500个字符"))]
     pub summary: Option<String>,
 
-    #[validate(length(min = 1, message = "内容不能为空"))]
+    #[serde(default)]
     pub content: String,
 
     #[validate(length(min = 1, message = "Markdown内容不能为空"))]
@@ -87,6 +92,7 @@ pub struct CreatePostRequest {
     #[validate(length(min = 1, message = "至少需要选择一个标签"))]
     pub tag_ids: Vec<i32>,
 
+    #[validate(range(min = 0, max = 2))]
     pub status: i16, // 0 草稿 1 发布 2 下线
 
     pub featured: bool,
@@ -111,6 +117,7 @@ pub struct UpdatePostRequest {
 
     pub tag_ids: Option<Vec<i32>>,
 
+    #[validate(range(min = 0, max = 2))]
     pub status: Option<i16>, // 0 草稿 1 发布 2 下线
 
     pub featured: Option<bool>,
@@ -135,4 +142,37 @@ pub struct PrevNextResult {
     pub prev_article: Option<PrevNextResponse>,
     #[serde(rename = "nextArticle")]
     pub next_article: Option<PrevNextResponse>,
+}
+
+#[cfg(test)]
+mod auth_post_input_tests {
+    use super::*;
+    #[test]
+    fn auth_post_creation_accepts_optional_html_and_validates_status() {
+        let mut post: CreatePostRequest = serde_json::from_value(serde_json::json!({"title":"Valid", "markdowncontent":"# Markdown", "category_id":1, "tag_ids":[1], "status":1, "featured":false})).unwrap();
+        assert!(post.content.is_empty());
+        assert!(post.validate().is_ok());
+        post.status = 4;
+        assert!(post.validate().is_err());
+        let update: UpdatePostRequest =
+            serde_json::from_value(serde_json::json!({"status":-1})).unwrap();
+        assert!(update.validate().is_err());
+    }
+}
+
+/// 管理列表筛选；游客始终只能读取已发布内容。
+#[derive(Debug, Deserialize, validator::Validate)]
+pub struct PostQuery {
+    #[serde(default = "crate::dto::common::default_page")]
+    #[validate(range(min = 1))]
+    pub page: u64,
+    #[serde(default = "crate::dto::common::default_limit")]
+    #[validate(range(min = 1, max = 100))]
+    pub limit: u64,
+    pub category: Option<i32>,
+    pub tag: Option<i32>,
+    #[validate(length(max = 100))]
+    pub search: Option<String>,
+    #[validate(range(min = 0, max = 2))]
+    pub status: Option<i16>,
 }

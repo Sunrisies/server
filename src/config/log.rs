@@ -5,7 +5,7 @@ use log4rs::{
     append::rolling_file::policy::compound::CompoundPolicy,
     append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller,
     append::rolling_file::policy::compound::trigger::size::SizeTrigger,
-    config::{Appender, Config, Root},
+    config::{Appender, Config, Logger, Root},
     encode::pattern::PatternEncoder,
 };
 
@@ -70,7 +70,13 @@ pub fn init_logger() {
         .encoder(Box::new(ColorEncoder))
         .build();
 
-    let size_trigger = SizeTrigger::new(1024 * 10); // 1MB
+    // Preserve the existing default; allow controlled diagnostics without recompiling.
+    let roll_bytes = std::env::var("LOG_ROLL_BYTES")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|v| *v >= 1024)
+        .unwrap_or(1024 * 10);
+    let size_trigger = SizeTrigger::new(roll_bytes);
     let window_roller = FixedWindowRoller::builder()
         .base(1)
         .build("logs/test.{}.log", 30)
@@ -84,7 +90,24 @@ pub fn init_logger() {
         .build("logs/log.log", Box::new(compound_policy))
         .unwrap();
 
+    let enabled = |name: &str| std::env::var(name).map(|v| v != "false").unwrap_or(true);
     let config = Config::builder()
+        .logger(Logger::builder().build(
+            "http_access",
+            if enabled("HTTP_ACCESS_LOG_ENABLED") {
+                LevelFilter::Info
+            } else {
+                LevelFilter::Off
+            },
+        ))
+        .logger(Logger::builder().build(
+            "connection",
+            if enabled("CONNECTION_LOG_ENABLED") {
+                LevelFilter::Info
+            } else {
+                LevelFilter::Off
+            },
+        ))
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .appender(Appender::builder().build("file", Box::new(file_appender)))
         .build(

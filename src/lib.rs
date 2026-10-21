@@ -3,6 +3,7 @@ pub use routes::config_routes;
 pub mod models;
 pub use models::prelude;
 pub mod config;
+pub mod observability;
 #[macro_use]
 pub mod macros;
 pub use config::create_db_pool;
@@ -12,6 +13,7 @@ pub mod middleware;
 pub use middleware::helpers::*;
 pub mod utils;
 pub use utils::sse::*;
+pub mod dropbox;
 pub mod handlers;
 pub mod services;
 pub use handlers::auth;

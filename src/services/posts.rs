@@ -30,13 +30,27 @@ impl PostService {
         };
 
         // 计算文章大小（字符数）
-        let size = post_data.content.len() as i32;
+        let size = i32::try_from(if post_data.content.is_empty() {
+            post_data.markdowncontent.len()
+        } else {
+            post_data.content.len()
+        })
+        .map_err(|_| AppError::BadRequest("文章内容过大".into()))?;
 
         // 开启事务
         let txn = db.begin().await.map_err(|e| {
             log::error!("开启事务失败: {e}");
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
+
+        crate::services::images::media_lock(&txn).await?;
+        crate::services::images::validate_media(
+            &txn,
+            &post_data.content,
+            &post_data.markdowncontent,
+            post_data.cover_image.as_deref(),
+        )
+        .await?;
 
         // 创建文章
         let new_post = posts::ActiveModel {
@@ -75,6 +89,8 @@ impl PostService {
                 AppError::DatabaseError("添加文章标签关联失败".to_string())
             })?;
         }
+
+        crate::services::post_versions::record(&txn, &created_post).await?;
 
         // 提交事务
         txn.commit().await.map_err(|e| {
@@ -130,7 +146,10 @@ impl PostService {
             id: created_post.id,
             uuid: created_post.uuid,
             title: created_post.title,
-            cover: created_post.cover_image.unwrap_or_default(),
+            cover: crate::services::category_cover::cover_url(
+                created_post.cover_image,
+                created_post.category_id,
+            ),
             author,
             publish_time: created_post.published_at,
             update_time: created_post.updated_at,
@@ -166,7 +185,7 @@ impl PostService {
 
         // 检查权限（只有作者可以编辑自己的文章）
         if post.author_id != user_id {
-            return Err(AppError::Unauthorized("没有权限编辑此文章".to_string()));
+            return Err(AppError::Forbidden("没有权限编辑此文章".to_string()));
         }
 
         // 开启事务
@@ -175,6 +194,37 @@ impl PostService {
             AppError::DatabaseError("服务器内部错误".to_string())
         })?;
 
+        crate::services::images::media_lock(&txn).await?;
+        crate::services::images::validate_media(
+            &txn,
+            post_data.content.as_deref().unwrap_or(&post.content),
+            post_data
+                .markdowncontent
+                .as_deref()
+                .unwrap_or(&post.markdowncontent),
+            post_data
+                .cover_image
+                .as_deref()
+                .or(post.cover_image.as_deref()),
+        )
+        .await?;
+
+        let previous_status = post.status;
+        let updated_size = if let Some(content) = &post_data.content {
+            Some(if content.is_empty() {
+                post_data
+                    .markdowncontent
+                    .as_deref()
+                    .unwrap_or(&post.markdowncontent)
+                    .len()
+            } else {
+                content.len()
+            })
+        } else if post.content.is_empty() {
+            post_data.markdowncontent.as_ref().map(String::len)
+        } else {
+            None
+        };
         // 更新文章
         let mut active_post: posts::ActiveModel = post.into();
 
@@ -187,12 +237,13 @@ impl PostService {
         }
         if let Some(content) = post_data.content {
             active_post.content = Set(content.clone());
-            let size = i32::try_from(content.len())
-                .map_err(|_| AppError::BadRequest("文章内容过长".to_string()))?;
-            active_post.size = Set(size);
         }
         if let Some(markdowncontent) = post_data.markdowncontent {
             active_post.markdowncontent = Set(markdowncontent);
+        }
+        if let Some(size) = updated_size {
+            active_post.size =
+                Set(i32::try_from(size).map_err(|_| AppError::BadRequest("文章内容过长".into()))?);
         }
         if let Some(cover_image) = post_data.cover_image {
             active_post.cover_image = Set(Some(cover_image));
@@ -202,10 +253,9 @@ impl PostService {
         }
         if let Some(status) = post_data.status {
             active_post.status = Set(status);
-            // // 如果状态从非发布变为发布，设置发布时间
-            // if post.status != 1 && status == 1 {
-            //     active_post.published_at = Set(now);
-            // }
+            if previous_status != 1 && status == 1 {
+                active_post.published_at = Set(now);
+            }
         }
         if let Some(featured) = post_data.featured {
             active_post.featured = Set(featured);
@@ -243,6 +293,8 @@ impl PostService {
                 })?;
             }
         }
+
+        crate::services::post_versions::record(&txn, &updated_post).await?;
 
         // 提交事务
         txn.commit().await.map_err(|e| {
@@ -298,7 +350,10 @@ impl PostService {
             id: updated_post.id,
             uuid: updated_post.uuid,
             title: updated_post.title,
-            cover: updated_post.cover_image.unwrap_or_default(),
+            cover: crate::services::category_cover::cover_url(
+                updated_post.cover_image,
+                updated_post.category_id,
+            ),
             author,
             publish_time: updated_post.published_at,
             update_time: updated_post.updated_at,
@@ -331,7 +386,7 @@ impl PostService {
 
         // 检查权限（只有作者可以删除自己的文章）
         if post.author_id != user_id {
-            return Err(AppError::Unauthorized("没有权限删除此文章".to_string()));
+            return Err(AppError::Forbidden("没有权限删除此文章".to_string()));
         }
 
         // 开启事务
@@ -349,6 +404,12 @@ impl PostService {
                 log::error!("删除文章标签关联失败: {e}");
                 AppError::DatabaseError("删除文章失败".to_string())
             })?;
+
+        // Explicitly clean visits for databases whose older FK does not cascade.
+        crate::models::post_views::Entity::delete_many()
+            .filter(crate::models::post_views::Column::PostId.eq(post.id))
+            .exec(&txn)
+            .await?;
 
         // 删除文章
         posts::Entity::delete_by_id(post.id)
@@ -368,13 +429,15 @@ impl PostService {
         Ok(())
     }
 
-    /// 增加文章阅读数（IP + 日期去重）
+    /// 增加文章阅读数。每日 IP 记录仅用于独立访客统计，不能用于阅读数去重：
+    /// 同一读者重新打开文章也应当算一次阅读。
     pub async fn increment_view(
         db: &DatabaseConnection,
         uuid: &str,
         ip: &str,
     ) -> Result<(), AppError> {
         let post = posts::Entity::find_by_uuid(uuid)
+            .filter(posts::Column::Status.eq(1))
             .one(db)
             .await
             .map_err(|e| {
@@ -383,55 +446,38 @@ impl PostService {
             })?
             .ok_or_else(|| AppError::NotFound("文章不存在".to_string()))?;
 
-        use chrono::Utc;
-        let today = Utc::now().date_naive();
+        let txn = db.begin().await?;
+        let _inserted =
+            crate::models::post_views::Entity::insert(crate::models::post_views::ActiveModel {
+                post_id: Set(post.id),
+                ip: Set(ip.to_string()),
+                viewed_date: Set(Utc::now().date_naive()),
+                ..Default::default()
+            })
+            .on_conflict(
+                sea_orm::sea_query::OnConflict::columns([
+                    crate::models::post_views::Column::PostId,
+                    crate::models::post_views::Column::Ip,
+                    crate::models::post_views::Column::ViewedDate,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec_without_returning(&txn)
+            .await?;
 
-        // 检查今天是否已经看过
-        let existing = crate::models::post_views::Entity::find()
-            .filter(crate::models::post_views::Column::PostId.eq(post.id))
-            .filter(crate::models::post_views::Column::Ip.eq(ip))
-            .filter(crate::models::post_views::Column::ViewedDate.eq(today))
-            .one(db)
-            .await
-            .map_err(|e| {
-                log::error!("查询阅读记录失败: {e}");
-                AppError::DatabaseError("服务器错误".to_string())
-            })?;
-
-        if existing.is_some() {
-            log::info!("文章 {} 今日已被该IP访问过，跳过计数", uuid);
-            return Ok(());
-        }
-
-        // 记录本次访问
-        crate::models::post_views::ActiveModel {
-            post_id: sea_orm::ActiveValue::Set(post.id),
-            ip: sea_orm::ActiveValue::Set(ip.to_string()),
-            viewed_date: sea_orm::ActiveValue::Set(today),
-            ..Default::default()
-        }
-        .insert(db)
-        .await
-        .map_err(|e| {
-            log::error!("记录阅读记录失败: {e}");
-            AppError::DatabaseError("服务器错误".to_string())
-        })?;
-
-        // view_count +1
+        // The daily record may already exist, but every valid page opening is a
+        // reading event. Keep both operations in one transaction so a failed
+        // counter update never leaves an inconsistent visit record behind.
         posts::Entity::update_many()
-            .filter(posts::Column::Uuid.eq(uuid))
+            .filter(posts::Column::Id.eq(post.id))
             .col_expr(
                 posts::Column::ViewCount,
                 Expr::col(posts::Column::ViewCount).add(1),
             )
-            .exec(db)
-            .await
-            .map_err(|e| {
-                log::error!("更新阅读数失败: {e}");
-                AppError::DatabaseError("更新失败".to_string())
-            })?;
-
-        log::info!("文章 {} 阅读数 +1（当前 {}）", uuid, post.view_count + 1);
+            .exec(&txn)
+            .await?;
+        txn.commit().await?;
         Ok(())
     }
 }

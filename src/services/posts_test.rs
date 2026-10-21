@@ -4,9 +4,55 @@ mod tests {
     use crate::models::{categories, post_tags, posts, tags, users};
     use crate::services::posts::PostService;
     use sea_orm::{
-        ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+        ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel,
+        QueryFilter, Set,
     };
     use uuid::Uuid;
+
+    #[tokio::test]
+    async fn markdown_only_draft_can_be_published_with_current_timestamp() {
+        let db = setup_test_db().await;
+        let user = create_test_user(&db).await;
+        let category = create_test_category(&db).await;
+        let tag = create_test_tag(&db, "写作流程".into()).await;
+        let markdown = "# 仅写 Markdown\n\n正文";
+        let created = PostService::create_post(
+            &db,
+            user.id,
+            CreatePostRequest {
+                title: "草稿到发布".into(),
+                summary: None,
+                content: String::new(),
+                markdowncontent: markdown.into(),
+                cover_image: None,
+                category_id: category.id,
+                tag_ids: vec![tag.id],
+                status: 0,
+                featured: false,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(created.size as usize, markdown.len());
+        let mut draft = posts::Entity::find_by_uuid(&created.uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap()
+            .into_active_model();
+        let old_date = chrono::Utc::now() - chrono::Duration::days(1);
+        draft.published_at = Set(old_date);
+        draft.update(&db).await.unwrap();
+        let update: UpdatePostRequest =
+            serde_json::from_value(serde_json::json!({"status":1,"markdowncontent":"# 新正文"}))
+                .unwrap();
+        let published = PostService::update_post(&db, user.id, &created.uuid, update)
+            .await
+            .unwrap();
+        assert!(published.is_publish);
+        assert!(published.publish_time > old_date);
+        assert_eq!(published.size as usize, "# 新正文".len());
+    }
 
     // 测试创建文章
     #[tokio::test]
@@ -364,5 +410,175 @@ mod tests {
             .exec(db)
             .await
             .expect("删除测试文章失败");
+    }
+    async fn view_fixture(db: &DatabaseConnection) -> String {
+        let user = create_test_user(db).await;
+        let category = create_test_category(db).await;
+        PostService::create_post(
+            db,
+            user.id,
+            CreatePostRequest {
+                title: "Concurrent view fixture".into(),
+                summary: None,
+                content: "<p>Test</p>".into(),
+                markdowncontent: "## Test".into(),
+                cover_image: None,
+                category_id: category.id,
+                tag_ids: vec![],
+                status: 1,
+                featured: false,
+            },
+        )
+        .await
+        .unwrap()
+        .uuid
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_views_count_each_read_and_keep_one_daily_visitor_record() {
+        use sea_orm::ConnectionTrait;
+        let db = setup_test_db().await;
+        let uuid = view_fixture(&db).await;
+        let mut tasks = Vec::new();
+        for _ in 0..40 {
+            let db = db.clone();
+            let uuid = uuid.clone();
+            tasks.push(tokio::spawn(async move {
+                PostService::increment_view(&db, &uuid, "198.51.100.1").await
+            }));
+        }
+        for task in tasks {
+            task.await.unwrap().unwrap();
+        }
+        let post = posts::Entity::find_by_uuid(&uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(post.view_count, 40);
+        let row = db
+            .query_one(sea_orm::Statement::from_string(
+                db.get_database_backend(),
+                "SELECT COUNT(*) AS total FROM post_views".to_owned(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i64>("", "total").unwrap(), 1);
+        PostService::delete_post(&db, post.author_id, &uuid)
+            .await
+            .unwrap();
+        assert!(
+            posts::Entity::find_by_uuid(&uuid)
+                .one(&db)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_failed_counter_update_rolls_back_visit_and_can_retry() {
+        use sea_orm::ConnectionTrait;
+        let db = setup_test_db().await;
+        let uuid = view_fixture(&db).await;
+        for sql in [
+            "CREATE OR REPLACE FUNCTION test_reject_view() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'isolated test failure'; END $$",
+            "CREATE TRIGGER test_reject_view BEFORE UPDATE OF view_count ON posts FOR EACH ROW EXECUTE FUNCTION test_reject_view()",
+        ] {
+            db.execute(sea_orm::Statement::from_string(
+                db.get_database_backend(),
+                sql.to_owned(),
+            ))
+            .await
+            .unwrap();
+        }
+        assert!(
+            PostService::increment_view(&db, &uuid, "198.51.100.1")
+                .await
+                .is_err()
+        );
+        let row = db
+            .query_one(sea_orm::Statement::from_string(
+                db.get_database_backend(),
+                "SELECT COUNT(*) AS total FROM post_views".to_owned(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i64>("", "total").unwrap(), 0);
+        db.execute(sea_orm::Statement::from_string(
+            db.get_database_backend(),
+            "DROP TRIGGER test_reject_view ON posts".to_owned(),
+        ))
+        .await
+        .unwrap();
+        PostService::increment_view(&db, &uuid, "198.51.100.1")
+            .await
+            .unwrap();
+        let post = posts::Entity::find_by_uuid(&uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(post.view_count, 1);
+    }
+    #[tokio::test]
+    async fn test_equal_timestamps_have_stable_pagination() {
+        use actix_web::{App, test, web};
+        let db = setup_test_db().await;
+        let uuid = view_fixture(&db).await;
+        let base = posts::Entity::find_by_uuid(&uuid)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        let records = (0..210).map(|index| posts::ActiveModel {
+            uuid: Set(Uuid::new_v4().to_string()),
+            author_id: Set(base.author_id),
+            category_id: Set(base.category_id),
+            title: Set(format!("Tie {index}")),
+            content: Set("HTML".into()),
+            markdowncontent: Set("Markdown".into()),
+            status: Set(1),
+            featured: Set(false),
+            view_count: Set(0),
+            size: Set(4),
+            created_at: Set(base.created_at),
+            updated_at: Set(base.updated_at),
+            published_at: Set(base.published_at),
+            ..Default::default()
+        });
+        posts::Entity::insert_many(records).exec(&db).await.unwrap();
+        let app = test::init_service(App::new().app_data(web::Data::new(db)).route(
+            "/posts",
+            web::get().to(crate::handlers::posts::get_posts_all_handler),
+        ))
+        .await;
+        let mut ids = Vec::new();
+        for page in 1..=3 {
+            let response = test::call_service(
+                &app,
+                test::TestRequest::get()
+                    .uri(&format!("/posts?page={page}&limit=100"))
+                    .to_request(),
+            )
+            .await;
+            assert!(response.status().is_success());
+            let data: serde_json::Value = test::read_body_json(response).await;
+            ids.extend(
+                data["data"]["data"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|post| post["id"].as_i64().unwrap()),
+            );
+        }
+        assert_eq!(ids.len(), 211);
+        assert_eq!(
+            ids.iter().collect::<std::collections::HashSet<_>>().len(),
+            211
+        );
+        assert!(ids.windows(2).all(|pair| pair[0] > pair[1]));
     }
 }

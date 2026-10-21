@@ -65,7 +65,7 @@ pub async fn register(
     summary = "登录",
     path = "/api/v1/auth/login",
     tag="鉴权模块",
-    description = "支持密码登录、邮箱验证码登录、手机号登录、第三方登录",
+    description = "支持密码与邮箱验证码登录；手机号、第三方登录暂未开放",
     request_body(
         content = LoginRequest,
         examples(
@@ -113,6 +113,7 @@ pub async fn register(
 )]
 #[route_permission(path = "/api/login", method = "post", permission = "auth:login")]
 pub async fn login(
+    req: actix_web::HttpRequest,
     db_pool: web::Data<DatabaseConnection>,
     login: web::Json<LoginRequest>,
     email_manager: web::Data<EmailVerificationManager>, // 添加这行
@@ -122,9 +123,45 @@ pub async fn login(
         return Ok(ApiResponse::from(AppError::ValidationError(msg)).to_http_response());
     }
     match login.0 {
-        LoginRequest::Password(p) => AuthService::login_by_pwd(db_pool, p).await,
-        LoginRequest::Email(e) => AuthService::login_by_email(db_pool, e, email_manager).await,
+        LoginRequest::Password(p) => {
+            crate::utils::login_limit::check(
+                db_pool.get_ref(),
+                &crate::utils::client_ip::client_ip(&req),
+                &p.account,
+            )
+            .await?;
+            AuthService::login_by_pwd(db_pool, p).await
+        }
+        LoginRequest::Email(e) => {
+            crate::utils::login_limit::check(
+                db_pool.get_ref(),
+                &crate::utils::client_ip::client_ip(&req),
+                &format!("email:{}", e.email),
+            )
+            .await?;
+            AuthService::login_by_email(db_pool, e, email_manager).await
+        }
         LoginRequest::Phone(p) => AuthService::login_by_phone(db_pool, p),
         LoginRequest::OAuth(o) => AuthService::login_by_oauth(db_pool, o),
     }
+}
+
+/// 注销当前 JWT，数据库撤销记录在重启和多实例间保持有效。
+pub async fn logout(req: actix_web::HttpRequest, db: web::Data<DatabaseConnection>) -> HttpResult {
+    if let Some(cookie) = req.cookie("access_token") {
+        if let Ok(claims) = crate::utils::jwt::decode_jwt(cookie.value()) {
+            crate::utils::token_revocation::revoke(db.get_ref(), cookie.value(), claims.exp)
+                .await?;
+        }
+    }
+    let cookie = actix_web::cookie::Cookie::build("access_token", "")
+        .path("/")
+        .http_only(true)
+        .secure(true)
+        .same_site(actix_web::cookie::SameSite::Strict)
+        .max_age(actix_web::cookie::time::Duration::ZERO)
+        .finish();
+    Ok(actix_web::HttpResponse::Ok()
+        .cookie(cookie)
+        .json(serde_json::json!({"code":200,"data":{"revoked":true}})))
 }

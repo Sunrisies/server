@@ -319,7 +319,14 @@ fn generate_list_code(
     quote! {
         #doc
         pub async fn #get_fn(db_pool: &DatabaseConnection, page: u64, limit: u64) -> Result<HttpResponse, #error_type> {
-            let paginator = #entity::Entity::find().paginate(db_pool, limit);
+            if page == 0 || !(1..=100).contains(&limit) {
+                return Err(#error_type::BadRequest("分页参数无效：page>=1，limit为1到100".into()));
+            }
+            let mut query = #entity::Entity::find();
+            for key in <<#entity::Entity as sea_orm::EntityTrait>::PrimaryKey as sea_orm::Iterable>::iter() {
+                query = sea_orm::QueryOrder::order_by_asc(query, sea_orm::PrimaryKeyToColumn::into_column(key));
+            }
+            let paginator = query.paginate(db_pool, limit);
             let total = paginator.num_items().await
                 .map_err(|e| { eprintln!("查询总数失败: {}", e); #error_type::DatabaseConnectionError("获取失败".into()) })?;
             let data = paginator.fetch_page(page.saturating_sub(1)).await

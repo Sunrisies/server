@@ -44,7 +44,8 @@
 
 ```env
 DATABASE_URL=postgres://postgres:password@localhost:5432/database
-JWT_SECRET=your_jwt_secret_key
+# 必须填写独立随机密钥，使用 openssl rand -hex 32 生成
+JWT_SECRET=
 SERVER_HOST=0.0.0.0
 SERVER_PORT=2345
 
@@ -144,3 +145,7 @@ server/
 ## 许可证
 
 MIT
+
+### 鉴权安全
+
+公开注册已关闭。`JWT_SECRET` 必须使用至少 32 字节的独立随机密钥，缺失或使用示例占位值时启动失败。密钥轮换和历史管理员审计见 [P0 上线说明](docs/auth-p0-rollout.md)。

@@ -33,17 +33,18 @@ pub async fn upload_image_handler(
     description = "分页获取已上传的图片列表",
     params(
         ("page" = Option<u64>, Query, description = "页码，默认1"),
-        ("limit" = Option<u64>, Query, description = "每页数量，默认10")
+        ("limit" = Option<u64>, Query, description = "每页数量，默认10"),
+        ("search" = Option<String>, Query, description = "图片文件名关键词")
     ),
     responses(
-        (status = 200, description = "获取成功", body = crate::ApiResponse<Vec<crate::models::images::Model>>),
+        (status = 200, description = "获取成功", body = crate::ApiResponse<crate::dto::common::PaginatedResp<crate::dto::image::ManagedImage>>),
         (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
     )
 )]
 pub async fn get_images_handler(
     db_pool: web::Data<DatabaseConnection>,
 
-    query: web::Query<crate::dto::common::PaginationQuery>,
+    query: web::Query<crate::dto::image::ImageQuery>,
 ) -> HttpResult {
     let result = ImageService::get_images(&db_pool, query.into_inner()).await?;
     Ok(result)
@@ -59,7 +60,7 @@ pub async fn get_images_handler(
         ("id" = i32, Path, description = "图片ID")
     ),
     responses(
-        (status = 200, description = "获取成功", body = crate::ApiResponse<crate::models::images::Model>),
+        (status = 200, description = "获取成功", body = crate::ApiResponse<crate::dto::image::ManagedImage>),
         (status = 404, description = "图片不存在", body = crate::ApiResponse<crate::EmptyResponse>),
         (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
     )
@@ -79,12 +80,13 @@ pub async fn get_image_by_id_handler(
     path = "/api/v1/images/{id}",
     tag = "图片管理",
     summary = "删除图片",
-    description = "根据ID删除已上传的图片",
+    description = "删除无文章引用的图片及存储对象，所有文章状态的正文和封面均受保护",
     params(
         ("id" = i32, Path, description = "图片ID")
     ),
     responses(
         (status = 200, description = "删除成功", body = crate::ApiResponse<crate::EmptyResponse>),
+        (status = 409, description = "图片仍被文章引用"),
         (status = 404, description = "图片不存在", body = crate::ApiResponse<crate::EmptyResponse>),
         (status = 500, description = "服务器内部错误", body = crate::ApiResponse<crate::EmptyResponse>)
     )

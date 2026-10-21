@@ -20,6 +20,12 @@ struct VersionInfo {
     git_branch: String,
     environment: String,
     language: String,
+    #[serde(rename = "artifactSha256", skip_serializing_if = "Option::is_none")]
+    artifact_sha256: Option<String>,
+    #[serde(rename = "cargoLockSha256", skip_serializing_if = "Option::is_none")]
+    cargo_lock_sha256: Option<String>,
+    #[serde(rename = "sourceTree", skip_serializing_if = "Option::is_none")]
+    source_tree: Option<String>,
 }
 #[utoipa::path(
     get,
@@ -38,7 +44,6 @@ pub async fn get_version() -> HttpResult {
         log::error!("Failed to read version.json: {}", e);
         AppError::InternalServerError("读取版本文件失败".to_string())
     })?;
-    log::info!("{}", version_content);
     // 解析JSON到结构体
     let version: VersionInfo = serde_json::from_str(&version_content).map_err(|e| {
         log::error!("Failed to parse version.json: {}", e);

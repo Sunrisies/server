@@ -40,8 +40,24 @@ pub async fn create_channel_handler(
     if req.extensions().get::<TokenClaims>().is_none() {
         return Err(AppError::Unauthorized("请先登录".to_string()));
     }
-    let result = ClipboardService::create_channel(db.as_ref(), body.into_inner()).await?;
+    let owner_uuid = req
+        .extensions()
+        .get::<TokenClaims>()
+        .map(|claims| claims.user_uuid.clone());
+    let result =
+        ClipboardService::create_channel(db.as_ref(), body.into_inner(), owner_uuid).await?;
     Ok(ApiResponse::success(result, "频道创建成功").to_http_response())
+}
+
+/// 返回当前已登录账号的最近一个存储空间，并签发新的空间凭证。
+pub async fn my_channel_handler(req: HttpRequest, db: web::Data<DatabaseConnection>) -> HttpResult {
+    let owner_uuid = req
+        .extensions()
+        .get::<TokenClaims>()
+        .map(|claims| claims.user_uuid.clone())
+        .ok_or_else(|| AppError::Unauthorized("请先登录站点账号".to_string()))?;
+    let result = ClipboardService::my_channel(db.as_ref(), &owner_uuid).await?;
+    Ok(ApiResponse::success(result, "获取个人存储空间成功").to_http_response())
 }
 
 /// 登录频道

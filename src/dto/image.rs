@@ -38,3 +38,32 @@ pub struct ImageInfo {
     pub human_readable_size: String,
     pub created_at: String,
 }
+
+#[derive(Debug, Deserialize, validator::Validate)]
+pub struct ImageQuery {
+    #[serde(default = "crate::dto::common::default_page")]
+    #[validate(range(min = 1))]
+    pub page: u64,
+    #[serde(default = "crate::dto::common::default_limit")]
+    #[validate(range(min = 1, max = 100))]
+    pub limit: u64,
+    #[validate(length(max = 100))]
+    pub search: Option<String>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct ImageReference {
+    pub uuid: String,
+    pub title: String,
+    pub status: i16,
+    pub body: bool,
+    pub cover: bool,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct ManagedImage {
+    #[serde(flatten)]
+    pub image: crate::models::images::Model,
+    pub reference_count: usize,
+    pub references: Vec<ImageReference>,
+}

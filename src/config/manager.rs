@@ -45,10 +45,19 @@ pub struct DatabaseSettings {
     pub set_schema_search_path: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct JwtSettings {
     pub secret: String,
     pub expiry: i64,
+}
+
+impl std::fmt::Debug for JwtSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JwtSettings")
+            .field("secret", &"[REDACTED]")
+            .field("expiry", &self.expiry)
+            .finish()
+    }
 }
 
 // 其他设置结构...
@@ -61,47 +70,21 @@ impl Default for AppConfig {
         Self {
             database: DatabaseSettings {
                 url: env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://blog.db".to_string()),
-                max_connections: env::var("DATABASE_MAX_CONNECTIONS")
-                    .unwrap_or_else(|_| "10".to_string())
-                    .parse()
-                    .unwrap(),
-                min_connections: env::var("DATABASE_MIN_CONNECTIONS")
-                    .unwrap_or_else(|_| "1".to_string())
-                    .parse()
-                    .unwrap(),
-                connect_timeout: env::var("DATABASE_CONNECT_TIMEOUT")
-                    .unwrap_or_else(|_| "10".to_string())
-                    .parse()
-                    .unwrap(),
-                acquire_timeout: env::var("DATABASE_ACQUIRE_TIMEOUT")
-                    .unwrap_or_else(|_| "10".to_string())
-                    .parse()
-                    .unwrap(),
-                idle_timeout: env::var("DATABASE_IDLE_TIMEOUT")
-                    .unwrap_or_else(|_| "10".to_string())
-                    .parse()
-                    .unwrap(),
-                max_lifetime: env::var("DATABASE_MAX_LIFETIME")
-                    .unwrap_or_else(|_| "10".to_string())
-                    .parse()
-                    .unwrap(),
-                sqlx_logging: env::var("DATABASE_SQLX_LOGGING")
-                    .unwrap_or_else(|_| "false".to_string())
-                    .parse()
-                    .unwrap(),
-                test_before_acquire: env::var("DATABASE_TEST_BEFORE_ACQUIRE")
-                    .unwrap_or_else(|_| "true".to_string())
-                    .parse()
-                    .unwrap(),
+                max_connections: env_or_default("DATABASE_MAX_CONNECTIONS", 10),
+                min_connections: env_or_default("DATABASE_MIN_CONNECTIONS", 1),
+                connect_timeout: env_or_default("DATABASE_CONNECT_TIMEOUT", 10),
+                acquire_timeout: env_or_default("DATABASE_ACQUIRE_TIMEOUT", 10),
+                idle_timeout: env_or_default("DATABASE_IDLE_TIMEOUT", 10),
+                max_lifetime: env_or_default("DATABASE_MAX_LIFETIME", 10),
+                sqlx_logging: env_or_default("DATABASE_SQLX_LOGGING", false),
+                test_before_acquire: env_or_default("DATABASE_TEST_BEFORE_ACQUIRE", true),
                 set_schema_search_path: env::var("DATABASE_SET_SCHEMA_SEARCH_PATH")
                     .unwrap_or_else(|_| "public".to_string()),
             },
             jwt: JwtSettings {
-                secret: env::var("JWT_SECRET").unwrap_or_else(|_| "your_secret_key".to_string()),
-                expiry: env::var("JWT_EXPIRATION")
-                    .unwrap_or_else(|_| "86400".to_string())
-                    .parse()
-                    .unwrap(),
+                secret: validated_jwt_secret(env::var("JWT_SECRET").ok())
+                    .expect("JWT_SECRET must be set to a strong secret of at least 32 bytes"),
+                expiry: env_or_default("JWT_EXPIRATION", 86400),
             },
             qi_niu: QiNiuSettings {
                 access_key: env::var("QINIU_ACCESS_KEY")
@@ -110,48 +93,30 @@ impl Default for AppConfig {
                     .unwrap_or_else(|_| "your_secret_key".to_string()),
                 bucket_name: env::var("QINIU_BUCKET").unwrap_or_else(|_| "your_bucket".to_string()),
                 domain_url: env::var("QINIU_DOMAIN").unwrap_or_else(|_| "your_domain".to_string()),
-                token_expiry_secs: env::var("QINIU_TOKEN_EXPIRY_SECS")
-                    .unwrap_or_else(|_| "3600".to_string())
-                    .parse()
-                    .unwrap(),
+                token_expiry_secs: env_or_default("QINIU_TOKEN_EXPIRY_SECS", 3600),
             },
             smtp: SmtpSettings {
                 smtp_server: env::var("SMTP_HOST")
                     .unwrap_or_else(|_| "smtp.example.com".to_string()),
-                smtp_port: env::var("SMTP_PORT")
-                    .unwrap_or_else(|_| "587".to_string())
-                    .parse()
-                    .unwrap(),
+                smtp_port: env_or_default("SMTP_PORT", 587),
                 from_email: env::var("SMTP_USERNAME")
                     .unwrap_or_else(|_| "your_username".to_string()),
 
                 from_password: env::var("SMTP_PASSWORD")
                     .unwrap_or_else(|_| "your_password".to_string()),
-                code_validity_period: env::var("CODE_VALIDITY_PERIOD")
-                    .unwrap_or_else(|_| "300".to_string())
-                    .parse()
-                    .unwrap(),
+                code_validity_period: env_or_default("CODE_VALIDITY_PERIOD", 300),
             },
             security: SecuritySettings {
                 salt: env::var("SECURITY_SALT").unwrap_or_else(|_| "your_salt".to_string()),
-                token_expiration: env::var("SECURITY_TOKEN_EXPIRATION")
-                    .unwrap_or_else(|_| "86400".to_string())
-                    .parse()
-                    .unwrap(),
+                token_expiration: env_or_default("SECURITY_TOKEN_EXPIRATION", 86400),
             },
             upload: UploadSettings {
-                max_size: env::var("UPLOAD_MAX_SIZE")
-                    .unwrap_or_else(|_| "10485760".to_string())
-                    .parse()
-                    .unwrap(),
+                max_size: env_or_default("UPLOAD_MAX_SIZE", 10_485_760),
                 allowed_types: None,
             },
             server: ServerSettings {
                 host: env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
-                port: env::var("SERVER_PORT")
-                    .unwrap_or_else(|_| "3000".to_string())
-                    .parse()
-                    .unwrap(),
+                port: env_or_default("SERVER_PORT", 3000),
                 // debug: std::env::var("CRUD_MACRO_DEBUG").is_ok(),
             },
         }
@@ -166,5 +131,61 @@ impl AppConfig {
     // 获取全局配置的静态方法
     pub fn global() -> &'static AppConfig {
         &CONFIG
+    }
+}
+
+fn env_or_default<T>(name: &str, default: T) -> T
+where
+    T: std::str::FromStr,
+{
+    match env::var(name) {
+        Ok(value) => match value.trim().parse() {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                log::warn!("Invalid {name}; using the documented default");
+                default
+            }
+        },
+        Err(_) => default,
+    }
+}
+
+fn validated_jwt_secret(secret: Option<String>) -> Result<String, &'static str> {
+    let secret = secret.ok_or("missing JWT_SECRET")?;
+    if secret.trim().len() < 32
+        || secret.contains("your_secret")
+        || secret.contains("your-secret")
+        || secret.contains("change_me")
+        || secret.contains("change-in-production")
+    {
+        return Err("invalid JWT_SECRET");
+    }
+    Ok(secret)
+}
+
+#[cfg(test)]
+mod jwt_secret_tests {
+    use super::{JwtSettings, validated_jwt_secret};
+    #[test]
+    fn debug_output_redacts_secret() {
+        let config = JwtSettings {
+            secret: "never-print-this-secret".into(),
+            expiry: 3600,
+        };
+        let output = format!("{config:?}");
+        assert!(!output.contains("never-print-this-secret"));
+        assert!(output.contains("[REDACTED]"));
+    }
+    #[test]
+    fn rejects_missing_weak_and_placeholder_keys() {
+        for value in [
+            None,
+            Some("your_secret_key".into()),
+            Some(" ".repeat(64)),
+            Some("change_me".repeat(8)),
+        ] {
+            assert!(validated_jwt_secret(value).is_err());
+        }
+        assert!(validated_jwt_secret(Some("0123456789abcdef0123456789abcdef".into())).is_ok());
     }
 }

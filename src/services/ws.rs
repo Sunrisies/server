@@ -62,7 +62,7 @@ pub async fn chat_route(
         path.1
     );
 
-    let (room_name, user_name) = path.into_inner();
+    let (room_name, _user_name) = path.into_inner();
 
     // 建立WebSocket连接
     let (response, session, msg_stream) = actix_ws::handle(&req, stream)?;
@@ -91,7 +91,7 @@ pub async fn chat_route(
         session,
         msg_stream,
         chat_server,
-        user_name,
+        room_name,
         session_id,
         db_pool_clone,
     ));
