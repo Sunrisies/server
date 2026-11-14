@@ -12,3 +12,8 @@ git_purge_file.sh
 
 # Runtime local image storage
 /data/images/
+
+# Local tooling / scratch files (must not be committed)
+.codegraph/
+.reasonix/
+src/bin/reset_pwd.rs
