@@ -23,11 +23,8 @@ impl PostService {
         post_data: CreatePostRequest,
     ) -> Result<PostResponse, AppError> {
         let now = Utc::now();
-        let published_at = if post_data.status == 1 {
-            Some(now)
-        } else {
-            None
-        };
+        // 外部同步（如 CSDN）可显式指定发布时间；普通新建文章使用当前时间。
+        let published_at = post_data.publish_time.unwrap_or(now);
 
         // 计算文章大小（字符数）
         let size = i32::try_from(if post_data.content.is_empty() {
@@ -67,7 +64,7 @@ impl PostService {
             view_count: Set(0),
             created_at: Set(now),
             updated_at: Set(now),
-            published_at: Set(published_at.unwrap_or(now)),
+            published_at: Set(published_at),
             size: Set(size),
             ..Default::default()
         };
@@ -210,6 +207,9 @@ impl PostService {
         .await?;
 
         let previous_status = post.status;
+        // 普通草稿创建时 published_at 与 created_at 相同；若两者不同，说明创建时
+        // 显式指定过（如 CSDN 同步），首次发布时不得覆盖为当前时间。
+        let has_explicit_publish_time = post.published_at != post.created_at;
         let updated_size = if let Some(content) = &post_data.content {
             Some(if content.is_empty() {
                 post_data
@@ -253,9 +253,13 @@ impl PostService {
         }
         if let Some(status) = post_data.status {
             active_post.status = Set(status);
-            if previous_status != 1 && status == 1 {
-                active_post.published_at = Set(now);
-            }
+        }
+        if let Some(publish_time) = post_data.publish_time {
+            active_post.published_at = Set(publish_time);
+        } else if previous_status != 1 && post_data.status == Some(1) && !has_explicit_publish_time
+        {
+            // 普通草稿首次发布：记录为当前发布时间
+            active_post.published_at = Set(now);
         }
         if let Some(featured) = post_data.featured {
             active_post.featured = Set(featured);

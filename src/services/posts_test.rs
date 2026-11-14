@@ -29,6 +29,7 @@ mod tests {
                 tag_ids: vec![tag.id],
                 status: 0,
                 featured: false,
+                publish_time: None,
             },
         )
         .await
@@ -41,6 +42,9 @@ mod tests {
             .unwrap()
             .into_active_model();
         let old_date = chrono::Utc::now() - chrono::Duration::days(1);
+        // 模拟“很久以前创建的普通草稿”：created_at 与 published_at 相同，
+        // 未显式指定过发布时间，因此首次发布应使用当前时间。
+        draft.created_at = Set(old_date);
         draft.published_at = Set(old_date);
         draft.update(&db).await.unwrap();
         let update: UpdatePostRequest =
@@ -81,6 +85,7 @@ mod tests {
             tag_ids: vec![tag1.id, tag2.id],
             status: 1, // 发布状态
             featured: false,
+            publish_time: None,
         };
 
         // 调用创建文章的服务方法
@@ -139,6 +144,7 @@ mod tests {
             tag_ids: vec![tag1.id],
             status: 0, // 草稿状态
             featured: false,
+            publish_time: None,
         };
 
         // 调用创建文章的服务方法
@@ -160,6 +166,71 @@ mod tests {
 
         // 清理测试数据
         cleanup_test_data(&db, post_response.id).await;
+    }
+
+    // 回归测试：CSDN 同步草稿保留原始发布时间，之后发布也不能被覆盖
+    #[tokio::test]
+    async fn test_csdn_sync_draft_keeps_original_publish_time() {
+        let db = setup_test_db().await;
+        let user = create_test_user(&db).await;
+        let category = create_test_category(&db).await;
+        let tag = create_test_tag(&db, "同步".to_string()).await;
+
+        let csdn_time = chrono::DateTime::parse_from_rfc3339("2021-03-04T02:05:06Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        let created = PostService::create_post(
+            &db,
+            user.id,
+            CreatePostRequest {
+                title: "同步文章标题".to_string(),
+                summary: None,
+                content: "同步文章内容".to_string(),
+                markdowncontent: "# 同步文章".to_string(),
+                cover_image: None,
+                category_id: category.id,
+                tag_ids: vec![tag.id],
+                status: 0,
+                featured: false,
+                publish_time: Some(csdn_time),
+            },
+        )
+        .await
+        .expect("创建同步草稿应该成功");
+
+        assert_eq!(
+            created.publish_time, csdn_time,
+            "草稿应显示 CSDN 原始发布时间"
+        );
+
+        let published = PostService::update_post(
+            &db,
+            user.id,
+            &created.uuid,
+            UpdatePostRequest {
+                title: None,
+                summary: None,
+                content: None,
+                markdowncontent: None,
+                cover_image: None,
+                category_id: None,
+                tag_ids: None,
+                status: Some(1),
+                featured: None,
+                publish_time: None,
+            },
+        )
+        .await
+        .expect("发布同步草稿应该成功");
+
+        assert!(published.is_publish);
+        assert_eq!(
+            published.publish_time, csdn_time,
+            "发布后仍应保留原始发布时间"
+        );
+
+        cleanup_test_data(&db, published.id).await;
     }
 
     // 测试创建隐藏文章
@@ -188,6 +259,7 @@ mod tests {
             tag_ids: vec![tag1.id],
             status: 2, // 隐藏状态
             featured: false,
+            publish_time: None,
         };
 
         // 调用创建文章的服务方法
@@ -237,6 +309,7 @@ mod tests {
             tag_ids: vec![tag1.id],
             status: 1,      // 发布状态
             featured: true, // 置顶
+            publish_time: None,
         };
 
         // 调用创建文章的服务方法
@@ -331,6 +404,7 @@ mod tests {
             tag_ids: vec![tag1.id],
             status: 1, // 发布状态
             featured: false,
+            publish_time: None,
         };
 
         // 调用创建文章的服务方法
@@ -355,6 +429,7 @@ mod tests {
             tag_ids: Some(vec![tag2.id, tag3.id]),
             status: Some(1),      // 保持发布状态
             featured: Some(true), // 设置为置顶
+            publish_time: None,
         };
 
         // 调用更新文章的服务方法
@@ -427,6 +502,7 @@ mod tests {
                 tag_ids: vec![],
                 status: 1,
                 featured: false,
+                publish_time: None,
             },
         )
         .await

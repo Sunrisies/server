@@ -553,6 +553,7 @@ mod tests {
             tag_ids: vec![tag],
             status: 0,
             featured: false,
+            publish_time: None,
         }
     }
     #[tokio::test]

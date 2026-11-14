@@ -85,6 +85,7 @@ mod tests {
                 tag_ids: vec![tag.id],
                 status: 1,
                 featured: false,
+                publish_time: None,
             },
         )
         .await

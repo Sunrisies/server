@@ -96,6 +96,10 @@ pub struct CreatePostRequest {
     pub status: i16, // 0 草稿 1 发布 2 下线
 
     pub featured: bool,
+
+    /// 指定发布时间（如 CSDN 同步导入的历史文章）；不传则使用当前时间
+    #[schema(value_type = String, format = DateTime)]
+    pub publish_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// 用于更新文章的请求体
@@ -121,6 +125,10 @@ pub struct UpdatePostRequest {
     pub status: Option<i16>, // 0 草稿 1 发布 2 下线
 
     pub featured: Option<bool>,
+
+    /// 修改发布时间（用于保留外部同步文章的原始发布时间）
+    #[schema(value_type = String, format = DateTime)]
+    pub publish_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 // 定义时间轴响应结构体
@@ -157,6 +165,29 @@ mod auth_post_input_tests {
         let update: UpdatePostRequest =
             serde_json::from_value(serde_json::json!({"status":-1})).unwrap();
         assert!(update.validate().is_err());
+    }
+
+    #[test]
+    fn create_and_update_accept_rfc3339_publish_time() {
+        let create: CreatePostRequest = serde_json::from_value(serde_json::json!({
+            "title": "CSDN 同步",
+            "markdowncontent": "# 正文",
+            "category_id": 1,
+            "tag_ids": [1],
+            "status": 0,
+            "featured": false,
+            "publish_time": "2021-03-04T02:05:06Z"
+        }))
+        .unwrap();
+        assert_eq!(
+            create.publish_time.unwrap().to_rfc3339(),
+            "2021-03-04T02:05:06+00:00"
+        );
+
+        let update: UpdatePostRequest =
+            serde_json::from_value(serde_json::json!({"publish_time": "2021-03-04T02:05:06Z"}))
+                .unwrap();
+        assert!(update.publish_time.is_some());
     }
 }
 
