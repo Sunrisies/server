@@ -119,6 +119,25 @@ fn is_text(name: &str, mime: &str) -> bool {
         .any(|ext| name.to_ascii_lowercase().ends_with(&format!(".{ext}")))
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum DropKind {
+    Text,
+    Media,
+}
+
+/// 文本优先分类。文件名与 Content-Type 同时命中两类时按文本处理：只给 10 MB
+/// 上限并强制 UTF-8，避免匿名用户用 `.txt` 文件名 + 媒体 MIME 拿到 100 MB
+/// 上传额度。
+fn classify_upload(name: &str, mime: &str, authenticated: bool) -> Option<DropKind> {
+    if is_text(name, mime) {
+        Some(DropKind::Text)
+    } else if authenticated && is_media(name, mime) {
+        Some(DropKind::Media)
+    } else {
+        None
+    }
+}
+
 fn is_media(name: &str, mime: &str) -> bool {
     let mime = mime.split(';').next().unwrap_or(mime).trim();
     if ["image/", "audio/", "video/"]
@@ -141,21 +160,19 @@ async fn save_drop(
     mime: String,
     bytes: Vec<u8>,
     text_content: Option<String>,
+    kind: DropKind,
 ) -> Result<DropCreated, AppError> {
     if bytes.is_empty() {
         return Err(AppError::BadRequest("文件内容不能为空".into()));
     }
-    let is_media_file = is_media(&name, &mime);
-    let max_size = if is_media_file {
-        MAX_MEDIA_SIZE
-    } else {
-        MAX_TEXT_SIZE
+    let max_size = match kind {
+        DropKind::Text => MAX_TEXT_SIZE,
+        DropKind::Media => MAX_MEDIA_SIZE,
     };
     if bytes.len() > max_size {
-        let message = if is_media_file {
-            "图片、音频或视频不能超过 100 MB"
-        } else {
-            "文本文件不能超过 10 MB"
+        let message = match kind {
+            DropKind::Text => "文本文件不能超过 10 MB",
+            DropKind::Media => "图片、音频或视频不能超过 100 MB",
         };
         return Err(AppError::FileTooLarge(message.into()));
     }
@@ -247,6 +264,7 @@ async fn create_text(
         "text/plain; charset=utf-8".into(),
         content.as_bytes().to_vec(),
         Some(content.to_owned()),
+        DropKind::Text,
     )
     .await?;
     Ok(ApiResponse::success(created, "取件链接已生成").to_http_response())
@@ -278,39 +296,35 @@ async fn create_file(
             .content_type()
             .map(ToString::to_string)
             .unwrap_or_else(|| "text/plain".into());
-        let text_file = is_text(&name, &mime);
-        let media_file = is_media(&name, &mime);
-        if !text_file && !(authenticated && media_file) {
+        let Some(kind) = classify_upload(&name, &mime, authenticated) else {
             let message = if authenticated {
                 "只支持文本、图片、音频或视频文件"
             } else {
                 "免登录仅支持文本文件；请登录后上传图片、音频或视频"
             };
             return Err(AppError::UnsupportedFileType(message.into()));
-        }
-        let max_size = if media_file {
-            MAX_MEDIA_SIZE
-        } else {
-            MAX_TEXT_SIZE
+        };
+        let max_size = match kind {
+            DropKind::Text => MAX_TEXT_SIZE,
+            DropKind::Media => MAX_MEDIA_SIZE,
         };
         let mut bytes = Vec::new();
         while let Some(chunk) = field.next().await {
             let chunk = chunk.map_err(|e| AppError::MultipartError(e.to_string()))?;
             if bytes.len() + chunk.len() > max_size {
-                let message = if media_file {
-                    "图片、音频或视频不能超过 100 MB"
-                } else {
-                    "文本文件不能超过 10 MB"
+                let message = match kind {
+                    DropKind::Text => "文本文件不能超过 10 MB",
+                    DropKind::Media => "图片、音频或视频不能超过 100 MB",
                 };
                 return Err(AppError::FileTooLarge(message.into()));
             }
             bytes.extend_from_slice(&chunk);
         }
-        if text_file {
+        if kind == DropKind::Text {
             std::str::from_utf8(&bytes)
                 .map_err(|_| AppError::UnsupportedFileType("文件必须是 UTF-8 文本".into()))?;
         }
-        let created = save_drop(db.get_ref(), name, mime, bytes, None).await?;
+        let created = save_drop(db.get_ref(), name, mime, bytes, None, kind).await?;
         return Ok(ApiResponse::success(created, "取件链接已生成").to_http_response());
     }
     Err(AppError::BadRequest("缺少 file 文件字段".into()))
@@ -346,15 +360,7 @@ async fn download(
     let name: String = row.try_get("", "file_name")?;
     let mime: String = row.try_get("", "mime_type")?;
     let text: Option<String> = row.try_get("", "text_content")?;
-    let path: Option<String> = row.try_get("", "storage_path")?;
-    let bytes = if let Some(text) = text {
-        text.into_bytes()
-    } else {
-        let path = path.ok_or_else(|| AppError::NotFound("文件不存在".into()))?;
-        tokio::fs::read(path)
-            .await
-            .map_err(|_| AppError::NotFound("文件不存在或已过期".into()))?
-    };
+    let storage_path: Option<String> = row.try_get("", "storage_path")?;
     let encoded_name = url::form_urlencoded::byte_serialize(name.as_bytes()).collect::<String>();
     let mut response = HttpResponse::Ok();
     response.insert_header(("Content-Type", mime));
@@ -364,7 +370,36 @@ async fn download(
     ));
     response.insert_header(("Cache-Control", "private, no-store"));
     response.insert_header(("X-Content-Type-Options", "nosniff"));
-    Ok(response.body(bytes))
+    if let Some(text) = text {
+        return Ok(response.body(text.into_bytes()));
+    }
+    let path = storage_path.ok_or_else(|| AppError::NotFound("文件不存在或已过期".into()))?;
+    let file = tokio::fs::File::open(&path)
+        .await
+        .map_err(|_| AppError::NotFound("文件不存在或已过期".into()))?;
+    let size = file
+        .metadata()
+        .await
+        .map_err(|_| AppError::NotFound("文件不存在或已过期".into()))?
+        .len();
+    // 按块流式响应，避免把最大 100 MB 的取件文件整体读进内存。
+    let stream = futures_util::stream::unfold(file, |mut file| async move {
+        use tokio::io::AsyncReadExt;
+        let mut chunk = vec![0u8; 64 * 1024];
+        match file.read(&mut chunk).await {
+            Ok(0) => None,
+            Ok(read) => {
+                chunk.truncate(read);
+                Some((
+                    Ok::<web::Bytes, std::io::Error>(web::Bytes::from(chunk)),
+                    file,
+                ))
+            }
+            Err(error) => Some((Err(error), file)),
+        }
+    });
+    response.insert_header(("Content-Length", size.to_string()));
+    Ok(response.streaming(stream))
 }
 
 async fn cleanup(db: &DatabaseConnection) -> Result<(), AppError> {
@@ -399,4 +434,58 @@ async fn cleanup(db: &DatabaseConnection) -> Result<(), AppError> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn anonymous_text_with_media_mime_stays_text() {
+        assert_eq!(
+            classify_upload("x.txt", "image/png", false),
+            Some(DropKind::Text)
+        );
+        assert_eq!(
+            classify_upload("x.txt", "video/mp4", false),
+            Some(DropKind::Text)
+        );
+    }
+
+    #[test]
+    fn anonymous_media_is_rejected() {
+        assert_eq!(classify_upload("x.png", "image/png", false), None);
+        assert_eq!(
+            classify_upload("clip.mp4", "application/octet-stream", false),
+            None
+        );
+    }
+
+    #[test]
+    fn authenticated_media_is_media() {
+        assert_eq!(
+            classify_upload("x.png", "image/png", true),
+            Some(DropKind::Media)
+        );
+        assert_eq!(
+            classify_upload("clip.mp4", "application/octet-stream", true),
+            Some(DropKind::Media)
+        );
+    }
+
+    #[test]
+    fn text_wins_when_both_rules_match() {
+        assert_eq!(
+            classify_upload("x.txt", "image/png", true),
+            Some(DropKind::Text)
+        );
+        assert_eq!(
+            classify_upload("notes.md", "text/markdown", true),
+            Some(DropKind::Text)
+        );
+        assert_eq!(
+            classify_upload("notes.md", "text/markdown", false),
+            Some(DropKind::Text)
+        );
+    }
 }

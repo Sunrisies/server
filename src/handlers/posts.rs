@@ -755,7 +755,6 @@ mod auth_author_tests {
             post_tags::ActiveModel {
                 post_id: Set(post.id),
                 tag_id: Set(tag.id),
-                ..Default::default()
             }
             .insert(&db)
             .await

@@ -26,6 +26,9 @@ pub async fn setup_test_db() -> DatabaseConnection {
 
     drop_all_tables(&db).await;
     run_migrations(&db).await;
+    crate::services::post_versions::initialize(&db)
+        .await
+        .unwrap();
     crate::services::content_revision::initialize(&db)
         .await
         .unwrap();
@@ -37,6 +40,7 @@ async fn drop_all_tables(db: &DatabaseConnection) {
     let tables = [
         "media_upload_jobs",
         "public_content_revision",
+        "post_versions",
         "post_views",
         "clipboard_entries",
         "clipboard_channels",

@@ -155,17 +155,17 @@ impl ImageService {
             .filter(uploads::Column::Key.eq(&result.key))
             .one(&txn)
             .await?;
-        if let Some(id) = job_id {
-            if !(existing.is_some() && uploaded.is_some()) {
-                let job = crate::models::media_upload_jobs::Entity::find_by_id(id)
-                    .one(&txn)
-                    .await?
-                    .ok_or_else(|| AppError::Conflict("上传确认任务已结束，请重新上传".into()))?;
-                if job.state != "pending" {
-                    return Err(AppError::Conflict(
-                        "该上传任务已进入清理，请重新上传".into(),
-                    ));
-                }
+        if let Some(id) = job_id
+            && !(existing.is_some() && uploaded.is_some())
+        {
+            let job = crate::models::media_upload_jobs::Entity::find_by_id(id)
+                .one(&txn)
+                .await?
+                .ok_or_else(|| AppError::Conflict("上传确认任务已结束，请重新上传".into()))?;
+            if job.state != "pending" {
+                return Err(AppError::Conflict(
+                    "该上传任务已进入清理，请重新上传".into(),
+                ));
             }
         }
         let image = match existing {
@@ -381,15 +381,16 @@ fn decoded(value: &str) -> String {
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let (Some(a), Some(b)) = (
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let (Some(a), Some(b)) = (
                 (bytes[i + 1] as char).to_digit(16),
                 (bytes[i + 2] as char).to_digit(16),
-            ) {
-                out.push((a * 16 + b) as u8);
-                i += 3;
-                continue;
-            }
+            )
+        {
+            out.push((a * 16 + b) as u8);
+            i += 3;
+            continue;
         }
         out.push(bytes[i]);
         i += 1;

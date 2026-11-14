@@ -93,16 +93,15 @@ pub async fn update_link(
         .one(db.get_ref())
         .await?
         .ok_or_else(|| AppError::NotFound("链接不存在".into()))?;
-    if let Some(name) = &body.name {
-        if external_links::Entity::find()
+    if let Some(name) = &body.name
+        && external_links::Entity::find()
             .filter(external_links::Column::Name.eq(name))
             .filter(external_links::Column::Id.ne(id))
             .one(db.get_ref())
             .await?
             .is_some()
-        {
-            return Err(AppError::Conflict("链接名称已存在".into()));
-        }
+    {
+        return Err(AppError::Conflict("链接名称已存在".into()));
     }
     let mut item = item.into_active_model();
     if let Some(name) = &body.name {

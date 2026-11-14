@@ -1,4 +1,6 @@
 [default.extend-words]
+# sqlx 0.8's own pool event name, quoted verbatim in src/observability.rs.
+aquired = "aquired"
 
 [files]
 extend-exclude = ["CHANGELOG.md", "notebooks/*"]

@@ -25,10 +25,10 @@ pub async fn feedback_handler(
     body.validate()
         .map_err(|_| AppError::BadRequest("反馈内容不符合要求".into()))?;
     if !["helpful", "not_helpful", "message"].contains(&body.kind.as_str()) {
-        return Err(AppError::BadRequest("不支持的反馈类型".into()).into());
+        return Err(AppError::BadRequest("不支持的反馈类型".into()));
     }
     if body.kind == "message" && body.message.as_deref().unwrap_or("").trim().is_empty() {
-        return Err(AppError::BadRequest("请填写反馈内容".into()).into());
+        return Err(AppError::BadRequest("请填写反馈内容".into()));
     }
     db.execute(Statement::from_sql_and_values(
         sea_orm::DatabaseBackend::Postgres,
