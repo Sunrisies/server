@@ -151,6 +151,7 @@ impl PostService {
             publish_time: created_post.published_at,
             update_time: created_post.updated_at,
             views: created_post.view_count,
+            csdn_views: created_post.csdn_view_count,
             is_top: created_post.featured,
             is_publish: created_post.status == 1,
             is_hide: created_post.status == 2,
@@ -264,6 +265,9 @@ impl PostService {
         if let Some(featured) = post_data.featured {
             active_post.featured = Set(featured);
         }
+        if let Some(csdn_view_count) = post_data.csdn_view_count {
+            active_post.csdn_view_count = Set(csdn_view_count);
+        }
 
         active_post.updated_at = Set(now);
 
@@ -362,6 +366,7 @@ impl PostService {
             publish_time: updated_post.published_at,
             update_time: updated_post.updated_at,
             views: updated_post.view_count,
+            csdn_views: updated_post.csdn_view_count,
             is_top: updated_post.featured,
             is_publish: updated_post.status == 1,
             is_hide: updated_post.status == 2,

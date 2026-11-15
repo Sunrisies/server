@@ -118,6 +118,7 @@ pub async fn get_posts_by_tag_handler(
         .column(posts::Column::PublishedAt)
         .column(posts::Column::UpdatedAt)
         .column(posts::Column::ViewCount)
+        .column(posts::Column::CsdnViewCount)
         .column(posts::Column::Featured)
         .column(posts::Column::Status)
         .column(posts::Column::Summary)
@@ -168,6 +169,7 @@ pub async fn get_posts_by_tag_handler(
             publish_time: post.published_at,
             update_time: post.updated_at,
             views: post.view_count,
+            csdn_views: post.csdn_view_count,
             is_top: post.featured,
             is_publish: post.status == 1,
             is_hide: post.status == 2,

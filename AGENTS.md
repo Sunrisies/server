@@ -76,6 +76,17 @@ CI：`.github/workflows/auth-security.yml`（ubuntu + postgres:17-alpine，`carg
   缺索引会导致 `POST /api/v1/posts/{uuid}/view` 500。
 - `src/sql/operations_schema.sql` 也是手工执行项，见 `docs/OPERATIONS.md`。
 
+## 接口变更同步（必须遵守）
+
+每次改动以下内容后，**立即**在 `../SYNC_LOG.md` 的「变更记录」区块顶部追加一条记录（按文件内模板格式）：
+- `src/routes/` 新增或修改了路由路径
+- `src/dto/` 请求/响应结构字段增删改
+- `src/handlers/` 接口行为约定变更（状态码、鉴权要求等）
+- `src/models/` 影响到对外接口的模型变更
+
+追加后同步更新「last_read 指针」表中本会话的时间戳。
+纯内部重构（不影响接口契约的）**不需要**记录。
+
 ## 安全 / 不要提交
 
 - `src/bin/reset_pwd.rs` 里有明文生产库口令，**永远不要提交**（已在 `.gitignore` 排除）。

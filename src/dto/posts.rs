@@ -37,6 +37,7 @@ pub struct PostListResponse {
     #[serde(serialize_with = "fmt_beijing")]
     pub update_time: chrono::DateTime<chrono::Utc>,
     pub views: i32,
+    pub csdn_views: i32,
     pub is_top: bool,
     pub is_publish: bool,
     pub is_hide: bool,
@@ -61,6 +62,7 @@ pub struct PostResponse {
     #[serde(serialize_with = "fmt_beijing")]
     pub update_time: chrono::DateTime<chrono::Utc>,
     pub views: i32,
+    pub csdn_views: i32,
     pub is_top: bool,
     pub is_publish: bool,
     pub is_hide: bool,
@@ -129,6 +131,9 @@ pub struct UpdatePostRequest {
     /// 修改发布时间（用于保留外部同步文章的原始发布时间）
     #[schema(value_type = String, format = DateTime)]
     pub publish_time: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// CSDN 观看次数（用于同步外部平台的观看数据）
+    pub csdn_view_count: Option<i32>,
 }
 
 // 定义时间轴响应结构体

@@ -49,6 +49,7 @@ pub struct PostWithCategory {
     pub published_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub view_count: i32,
+    pub csdn_view_count: i32,
     pub featured: bool,
     pub status: i16,
     pub summary: Option<String>,

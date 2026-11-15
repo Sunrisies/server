@@ -25,6 +25,7 @@ pub struct Model {
     pub status: i16,
     pub featured: bool,
     pub view_count: i32,
+    pub csdn_view_count: i32,
     #[schema(value_type = String, format = DateTime)]
     #[serde(serialize_with = "fmt_beijing")]
     pub created_at: DateTimeUtc,

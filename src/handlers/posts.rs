@@ -134,9 +134,9 @@ pub async fn get_posts_all_handler(
             .filter(post_tags::Column::TagId.eq(tag_id))
             .distinct(); // 避免因一篇文章有多个标签而产生重复
     }
-    // 按创建时间倒序
+    // 按发布时间倒序（优先使用发布时间，如果为空则使用创建时间）
     let query_builder = query_builder
-        .order_by_desc(posts::Column::CreatedAt)
+        .order_by_desc(posts::Column::PublishedAt)
         .order_by_desc(posts::Column::Id);
     // 分页查询（总数会自动应用过滤条件，无需额外处理）
     let paginator = query_builder.paginate(db_pool.as_ref(), limit);
@@ -230,6 +230,7 @@ pub async fn get_posts_all_handler(
                 publish_time: post.published_at,
                 update_time: post.updated_at,
                 views: post.view_count,
+                csdn_views: post.csdn_view_count,
                 is_top: post.featured,
                 is_publish: post.status == 1,
                 is_hide: post.status == 2,
@@ -386,6 +387,7 @@ pub async fn get_posts_handler(
         publish_time: post.published_at,
         update_time: post.updated_at,
         views: post.view_count,
+        csdn_views: post.csdn_view_count,
         is_top: post.featured,
         is_publish: post.status == 1,
         is_hide: post.status == 2,
