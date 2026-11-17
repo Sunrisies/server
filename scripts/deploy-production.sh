@@ -12,7 +12,10 @@ readonly REMOTE_BASE="/home/docker/server/releases/20261017-backend"
 readonly RUNTIME_ENV="$REMOTE_BASE/production.runtime.env"
 readonly RELEASE="${1:-0.1.20-$(date +%Y%m%d-%H%M%S)}"
 readonly IMAGE="web-server:$RELEASE"
-readonly ARCHIVE="/tmp/web-server-$RELEASE-src.tar.gz"
+# 归档放在仓库内的 target/（已 gitignore）并使用相对路径：
+# 本机 PATH 里的 scp 是 Windows OpenSSH，它无法解析 MSYS 风格的 /tmp 绝对路径，
+# 而相对路径由各 scp 实现按自身 cwd 解析，两边都能找到文件。
+readonly ARCHIVE="target/web-server-$RELEASE-src.tar.gz"
 readonly REMOTE_RELEASE="$REMOTE_BASE/$RELEASE"
 readonly CANDIDATE="web-server-candidate-$RELEASE"
 readonly ROLLBACK="web-server-rollback-$RELEASE"
@@ -26,6 +29,7 @@ cd "$ROOT_DIR"
 cargo fmt --check
 cargo check -q
 
+mkdir -p target
 tar --exclude=.git --exclude=target --exclude=.env --exclude=.env.* \
   --exclude=temp_uploads --exclude=data --exclude=logs \
   --exclude=.codegraph --exclude=.reasonix --exclude=src/bin \

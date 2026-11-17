@@ -2,8 +2,8 @@
 FROM rust:1.93.1-alpine AS builder
 
 # 生产机在境内，官方源 dl-cdn.alpinelinux.org 下载会停滞（曾卡在 g++ 步骤 19 分钟），
-# 构建前先切到阿里云镜像，避免每次构建都赌网络。
-RUN sed -i 's#dl-cdn.alpinelinux.org#mirrors.aliyun.com#g' /etc/apk/repositories && \
+# 构建前切到腾讯云镜像（容器内实测：阿里云 CDN 不通、腾讯云/清华可达），避免每次构建都赌网络。
+RUN sed -i 's#dl-cdn.alpinelinux.org#mirrors.cloud.tencent.com#g' /etc/apk/repositories && \
     apk add --no-cache build-base openssl perl
 
 WORKDIR /app
