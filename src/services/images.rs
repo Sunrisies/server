@@ -665,6 +665,7 @@ mod tests {
             status: Set(0),
             featured: Set(false),
             view_count: Set(0),
+            csdn_view_count: Set(0),
             created_at: Set(now),
             updated_at: Set(now),
             published_at: Set(now),

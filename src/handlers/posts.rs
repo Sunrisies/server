@@ -745,6 +745,7 @@ mod auth_author_tests {
                 status: Set(status),
                 featured: Set(false),
                 view_count: Set(0),
+                csdn_view_count: Set(0),
                 size: Set(10),
                 created_at: Set(now + chrono::Duration::seconds(i64::from(status))),
                 updated_at: Set(now),

@@ -219,6 +219,7 @@ mod tests {
                 status: Some(1),
                 featured: None,
                 publish_time: None,
+                csdn_view_count: None,
             },
         )
         .await
@@ -430,6 +431,7 @@ mod tests {
             status: Some(1),      // 保持发布状态
             featured: Some(true), // 设置为置顶
             publish_time: None,
+            csdn_view_count: None,
         };
 
         // 调用更新文章的服务方法
@@ -619,6 +621,7 @@ mod tests {
             status: Set(1),
             featured: Set(false),
             view_count: Set(0),
+            csdn_view_count: Set(0),
             size: Set(4),
             created_at: Set(base.created_at),
             updated_at: Set(base.updated_at),

@@ -62,6 +62,7 @@ impl PostService {
             status: Set(post_data.status),
             featured: Set(post_data.featured),
             view_count: Set(0),
+            csdn_view_count: Set(0),
             created_at: Set(now),
             updated_at: Set(now),
             published_at: Set(published_at),

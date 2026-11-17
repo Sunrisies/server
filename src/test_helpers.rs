@@ -160,6 +160,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
         markdowncontent TEXT NOT NULL DEFAULT '',
         cover_image VARCHAR(512), status SMALLINT DEFAULT 0,
         featured BOOLEAN DEFAULT FALSE, view_count INTEGER DEFAULT 0,
+        csdn_view_count INTEGER NOT NULL DEFAULT 0,
         size INTEGER DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

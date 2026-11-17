@@ -19,13 +19,14 @@ cargo run                # 监听 SERVER_HOST:SERVER_PORT
 启动时会 drop/recreate 表，务必使用独立测试库。
 
 ```bash
-export DATABASE_URL_TEST='postgres://postgres:local-ci-only@127.0.0.1:55432/server_acceptance_test'
+export DATABASE_URL_TEST='postgres://postgres:local-ci-only@127.0.0.1:55440/server_acceptance_test'
 export JWT_SECRET='test-only-signing-key-never-use-in-production'
 cargo test --locked -- --test-threads=1
 ```
 
 本机环境：Windows 的 5432 被 navicat 隧道占用，测试库跑在 **WSL Ubuntu-22.04 的 PostgreSQL 14**，
-端口 `55432`，用户 `postgres` / 密码 `local-ci-only`，库 `server_acceptance_test`。
+端口 `55440`，用户 `postgres` / 密码 `local-ci-only`，库 `server_acceptance_test`。
+（原端口 `55432` 的 IPv4 段被一个无属主的进程占用，导致 postgres 只能绑 IPv6、TCP 认证失败 `28P01`，故换到 55440。）
 启动方式：`wsl -d Ubuntu-22.04 -- sudo service postgresql start`。
 编译产物建议放 Linux 文件系统（`CARGO_TARGET_DIR=/root/target`），避免 `/mnt/d` 上编译过慢。
 
