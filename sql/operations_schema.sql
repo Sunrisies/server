@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS post_views (
 );
 CREATE INDEX IF NOT EXISTS post_views_daily_unique ON post_views(post_id, ip, viewed_date);
 
+-- 文章 CSDN 阅读量：代码 entity 已有该字段，旧库缺列会导致所有 posts 查询报错。
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS csdn_view_count INTEGER NOT NULL DEFAULT 0;
+
 -- 云剪贴板：频道与条目。历史库已存在时由 IF NOT EXISTS 跳过，owner_uuid 列随后兼容补齐。
 CREATE TABLE IF NOT EXISTS clipboard_channels (
   id SERIAL PRIMARY KEY,

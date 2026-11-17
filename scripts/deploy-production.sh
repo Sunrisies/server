@@ -26,8 +26,18 @@ cd "$ROOT_DIR"
 cargo fmt --check
 cargo check -q
 
-tar --exclude=.git --exclude=target --exclude=.env --exclude=temp_uploads \
+tar --exclude=.git --exclude=target --exclude=.env --exclude=.env.* \
+  --exclude=temp_uploads --exclude=data --exclude=logs \
+  --exclude=.codegraph --exclude=.reasonix --exclude=src/bin \
   -czf "$ARCHIVE" .
+
+# 发布包绝不能含本地密钥或明文口令脚本
+if tar -tzf "$ARCHIVE" | grep -Eq '(^|/)(\.env[^/]*|reset_pwd\.rs|gen_hash\.rs)$'; then
+  echo "Refusing to ship secrets: remove .env / src/bin from the archive" >&2
+  rm -f "$ARCHIVE"
+  exit 3
+fi
+
 scp "$ARCHIVE" "root@$HOST:$REMOTE_BASE/"
 
 ssh "root@$HOST" "RELEASE='$RELEASE' IMAGE='$IMAGE' REMOTE_BASE='$REMOTE_BASE' RUNTIME_ENV='$RUNTIME_ENV' CANDIDATE='$CANDIDATE' ROLLBACK='$ROLLBACK' GIT_HASH='$GIT_HASH' GIT_BRANCH='$GIT_BRANCH' bash -s" <<'REMOTE'
@@ -79,14 +89,32 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 
-docker stop web-server >/dev/null
-docker rename web-server "$ROLLBACK"
+previous_state="none"
+rollback() {
+  local code=$?
+  if [ "$previous_state" = "renamed" ]; then
+    echo "新版本切换失败，回滚到 $ROLLBACK" >&2
+    docker rm -f web-server >/dev/null 2>&1 || true
+    docker rename "$ROLLBACK" web-server || true
+    docker start web-server || true
+  fi
+  exit "$code"
+}
+trap rollback ERR
+
+if docker inspect web-server >/dev/null 2>&1; then
+  docker stop web-server >/dev/null
+  docker rm -f "$ROLLBACK" >/dev/null 2>&1 || true
+  docker rename web-server "$ROLLBACK"
+  previous_state="renamed"
+fi
 docker run -d --init --name web-server --restart always --network my_app_network \
   -p 22345:2345 --env-file "$RUNTIME_ENV" \
   -v /home/docker/server/web-server:/app/logs \
   -v /home/docker/server/dropbox:/app/data/dropbox "$IMAGE" >/dev/null
 sleep 10
 curl -fsS http://127.0.0.1:22345/api/v1/version >/dev/null
+trap - ERR
 docker rm -f "$CANDIDATE" >/dev/null 2>&1 || true
 
 curl -fsS http://127.0.0.1:22345/api/v1/version | python3 -c 'import json,sys; data=json.load(sys.stdin)["data"]; assert data["build"] == sys.argv[1], data; print(json.dumps(data, ensure_ascii=False))' "$RELEASE"
