@@ -33,23 +33,23 @@ bash scripts/apply-operations-schema.sh          # 或按 docs/OPERATIONS.md 手
 临时文件箱的文本、图片、音频和视频文件保存在服务器 `/home/docker/server/dropbox/`，并挂载到容器 `/app/data/dropbox/`。候选和正式容器共用该持久目录；文件 24 小时后由后端自动清理。免登录上传仅允许文本，媒体上传要求有效登录会话。
 
 ```bash
-export RELEASE=0.1.20-$(date +%Y%m%d-%H%M%S)
+export RELEASE=0.1.22-$(date +%Y%m%d-%H%M%S)   # 必须显式传，脚本默认值的基线写死为 0.1.20
 bash scripts/deploy-production.sh "$RELEASE"
 curl --fail https://api.sunrise1024.top/api/v1/version
 ```
 
-脚本将旧容器保留为 `web-server-rollback-$RELEASE`。若新版本验收失败，停止当前 `web-server`，将该容器改回 `web-server` 后启动；同时保存失败容器日志以便排查。
+脚本将旧容器保留为 `web-server-rollback-$RELEASE`。若新版本未通过验收，停止当前 `web-server`，把 `web-server-rollback-$RELEASE` 改回 `web-server` 后启动即可回退；回滚前先保存失败容器日志：`docker logs web-server --tail 200`。
 
-若新版本未通过验收，停止当前 `web-server`，将 `web-server-rollback-$RELEASE` 改回 `web-server` 后启动；同时保存失败容器日志以便排查。
+脚本的完整用法、验收命令、失败排查见 [`docs/deploy-production-usage.md`](deploy-production-usage.md)。
 
 ## 4. Git 提交与推送
 
-当前开发分支为 `codex/fix-auth-p0`。完成线上验收后提交本次代码与文档：
+当前主分支为 `main`。完成线上验收后提交本次代码与文档：
 
 ```bash
 git add -A
 git commit -m "feat: add publishing analytics and version history"
-git push origin codex/fix-auth-p0
+git push origin main
 ```
 
 推送后创建合并请求或按团队流程合并到主分支。最后用 `git status --short` 确认工作区干净，并记录发布镜像标签、提交哈希与验收结果。
